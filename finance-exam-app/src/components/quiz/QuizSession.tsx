@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, BarChart3 } from "lucide-react";
-import QuestionCard from "./QuestionCard";
 import type { Question } from "@/lib/types";
+import { addOfflineAttempt, setupAutoSync, isOnline } from "@/lib/offline-store";
+import QuestionCard from "./QuestionCard";
 
 interface QuizSessionProps {
   mode: "chapter" | "random" | "weak";
@@ -52,22 +53,37 @@ export default function QuizSession({
 
   useEffect(() => {
     fetchQuestions();
+    const cleanup = setupAutoSync();
+    return cleanup;
   }, [fetchQuestions]);
 
   const handleSubmit = async (answer: string) => {
     const question = questions[currentIdx];
     if (!question) return;
 
-    const res = await fetch("/api/questions/attempt", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ questionId: question.id, userAnswer: answer }),
-    });
-    const data = await res.json();
+    let isCorrectResult: boolean;
+
+    try {
+      const res = await fetch("/api/questions/attempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: question.id, userAnswer: answer }),
+      });
+      const data = await res.json();
+      isCorrectResult = data.isCorrect;
+    } catch {
+      // Offline fallback: use local answer checking
+      isCorrectResult = addOfflineAttempt(
+        question.id,
+        answer,
+        question.answer,
+        question.type
+      );
+    }
 
     setResults((prev) => [
       ...prev,
-      { questionId: question.id, isCorrect: data.isCorrect },
+      { questionId: question.id, isCorrect: isCorrectResult },
     ]);
   };
 
