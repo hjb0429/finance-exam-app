@@ -8,3 +8,4 @@ node_modules/
 *.log
 # PDF source files (too large for GitHub)
 《中级财务管理》*/
+*.zip
