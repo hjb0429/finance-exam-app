@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Chapter {
+  id        Int       @id @default(autoincrement())
+  title     String
+  order     Int
+  guideSummary    String?
+  changeSummary   String?
+  sections  Section[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Section {
+  id         Int       @id @default(autoincrement())
+  chapterId  Int
+  title      String
+  order      Int
+  chapter    Chapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  knowledgePoints KnowledgePoint[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model KnowledgePoint {
+  id          Int       @id @default(autoincrement())
+  sectionId   Int
+  title       String
+  content     String
+  masteryLevel String   @default("unlearned") // unlearned | weak | mastered
+  section     Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  progress    UserProgress[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Question {
+  id               Int       @id @default(autoincrement())
+  knowledgePointId Int
+  type             String    // single_choice | multi_choice | true_false | calculation
+  stem             String    // 题干
+  options          String    // JSON array of options
+  answer           String    // 正确答案
+  analysis         String    // 解析
+  difficulty       Int       @default(1) // 1-5
+  knowledgePoint   KnowledgePoint @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+  attempts         QuizAttempt[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model QuizAttempt {
+  id          Int       @id @default(autoincrement())
+  questionId  Int
+  userAnswer  String
+  isCorrect   Boolean
+  createdAt   DateTime  @default(now())
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model UserProgress {
+  id               Int       @id @default(autoincrement())
+  knowledgePointId Int
+  correctCount     Int       @default(0)
+  totalCount       Int       @default(0)
+  masteryScore     Float     @default(0) // 0-100
+  knowledgePoint   KnowledgePoint @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([knowledgePointId])
+}

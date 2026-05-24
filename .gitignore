@@ -1,0 +1,10 @@
+.env
+node_modules/
+.next/
+.pm2/
+.claude/
+*.code-workspace
+.DS_Store
+*.log
+# PDF source files (too large for GitHub)
+《中级财务管理》*/
