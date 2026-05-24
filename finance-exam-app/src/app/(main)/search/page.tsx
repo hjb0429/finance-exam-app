@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Search, BookOpen, HelpCircle } from "lucide-react";
 import Link from "next/link";
+import { searchLocalQuestions, cacheQuestions } from "@/lib/local-db";
+import type { LocalQuestion } from "@/lib/local-db";
 
 interface SearchResults {
   knowledgePoints: Array<{
@@ -23,18 +25,50 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Cache questions for offline search
+  useEffect(() => {
+    fetch("/api/questions?limit=600")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.questions) {
+          cacheQuestions(
+            data.questions.map((q: { id: number; type: string; stem: string; options: string[]; answer: string; analysis: string }) => ({
+              id: q.id,
+              type: q.type,
+              stem: q.stem,
+              options: q.options,
+              answer: q.answer,
+              analysis: q.analysis || "",
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) {
       setResults(null);
       return;
     }
     setLoading(true);
+
     try {
+      // Try server first
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       setResults(data);
     } catch {
-      setResults(null);
+      // Offline: search locally
+      const localQuestions = searchLocalQuestions(q);
+      setResults({
+        knowledgePoints: [],
+        questions: localQuestions.map((q) => ({
+          id: q.id,
+          stem: q.stem,
+          type: q.type,
+        })),
+      });
     } finally {
       setLoading(false);
     }
@@ -44,7 +78,6 @@ export default function SearchPage() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-text-primary">搜索</h2>
 
-      {/* Search input */}
       <div className="rounded-xl bg-white p-6 shadow-sm">
         <div className="relative">
           <Search
@@ -64,7 +97,6 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* Results */}
       {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -78,7 +110,6 @@ export default function SearchPage() {
 
       {results && (
         <div className="space-y-6">
-          {/* Knowledge Points */}
           {results.knowledgePoints.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 text-sm font-semibold text-text-secondary">
@@ -102,7 +133,6 @@ export default function SearchPage() {
             </div>
           )}
 
-          {/* Questions */}
           {results.questions.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 text-sm font-semibold text-text-secondary">
@@ -131,7 +161,6 @@ export default function SearchPage() {
             </div>
           )}
 
-          {/* No results */}
           {query &&
             results.knowledgePoints.length === 0 &&
             results.questions.length === 0 && (
@@ -145,7 +174,6 @@ export default function SearchPage() {
         </div>
       )}
 
-      {/* Initial state */}
       {!query && !results && (
         <div className="rounded-xl bg-white p-8 text-center shadow-sm">
           <Search size={40} className="mx-auto text-primary-lighter" />

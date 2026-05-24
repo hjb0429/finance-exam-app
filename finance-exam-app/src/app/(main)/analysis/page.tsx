@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BarChart3, Target, TrendingUp, BookOpen } from "lucide-react";
+import { getLocalStats } from "@/lib/local-db";
 
 interface AnalysisData {
   studyDays: number;
@@ -28,13 +29,13 @@ interface AnalysisData {
 }
 
 export default function AnalysisPage() {
-  const [data, setData] = useState<AnalysisData | null>(null);
+  const [serverData, setServerData] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/stats")
       .then((res) => res.json())
-      .then((d) => setData(d))
+      .then((d) => setServerData(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -53,7 +54,13 @@ export default function AnalysisPage() {
     );
   }
 
-  if (!data || data.totalAttempts === 0) {
+  // Merge server + local data
+  const localStats = getLocalStats();
+  const serverAttempts = serverData?.totalAttempts ?? 0;
+  const localAttempts = localStats.totalAttempts ?? 0;
+  const hasAnyData = serverAttempts > 0 || localAttempts > 0;
+
+  if (!hasAnyData) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-text-primary">学习分析</h2>
@@ -70,6 +77,24 @@ export default function AnalysisPage() {
     );
   }
 
+  // Use server data if richer, otherwise local
+  const display: AnalysisData =
+    serverData && serverData.totalAttempts > 0
+      ? serverData
+      : {
+          studyDays: 0,
+          completedChapters: 0,
+          totalChapters: 10,
+          totalKnowledgePoints: 146,
+          masteredKnowledgePoints: 0,
+          totalQuestions: 586,
+          totalAttempts: localAttempts,
+          correctRate: localStats.correctRate ?? 0,
+          weakPoints: 0,
+          chapterBreakdown: [],
+          knowledgePointProgress: [],
+        };
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-text-primary">学习分析</h2>
@@ -77,10 +102,14 @@ export default function AnalysisPage() {
       {/* Overview */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: "总做题数", value: data.totalAttempts, icon: Target },
-          { label: "正确率", value: `${data.correctRate}%`, icon: TrendingUp },
-          { label: "已掌握知识点", value: `${data.masteredKnowledgePoints}/${data.totalKnowledgePoints}`, icon: BookOpen },
-          { label: "薄弱点", value: data.weakPoints, icon: BarChart3 },
+          { label: "总做题数", value: display.totalAttempts, icon: Target },
+          { label: "正确率", value: `${display.correctRate}%`, icon: TrendingUp },
+          {
+            label: "已掌握知识点",
+            value: `${display.masteredKnowledgePoints}/${display.totalKnowledgePoints}`,
+            icon: BookOpen,
+          },
+          { label: "薄弱点", value: display.weakPoints, icon: BarChart3 },
         ].map((item) => (
           <div
             key={item.label}
@@ -97,17 +126,15 @@ export default function AnalysisPage() {
 
       {/* Mastery bar */}
       <div className="rounded-xl bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-text-primary">
-          整体掌握度
-        </h3>
+        <h3 className="text-lg font-semibold text-text-primary">整体掌握度</h3>
         <div className="mt-4">
           <div className="flex h-4 rounded-full bg-page-bg overflow-hidden">
             <div
               className="bg-success transition-all"
               style={{
                 width: `${
-                  data.totalKnowledgePoints > 0
-                    ? (data.masteredKnowledgePoints / data.totalKnowledgePoints) * 100
+                  display.totalKnowledgePoints > 0
+                    ? (display.masteredKnowledgePoints / display.totalKnowledgePoints) * 100
                     : 0
                 }%`,
               }}
@@ -116,8 +143,8 @@ export default function AnalysisPage() {
               className="bg-warning transition-all"
               style={{
                 width: `${
-                  data.totalKnowledgePoints > 0
-                    ? (data.weakPoints / data.totalKnowledgePoints) * 100
+                  display.totalKnowledgePoints > 0
+                    ? (display.weakPoints / display.totalKnowledgePoints) * 100
                     : 0
                 }%`,
               }}
@@ -127,28 +154,24 @@ export default function AnalysisPage() {
           <div className="mt-3 flex justify-between text-sm text-text-secondary">
             <span>
               已掌握:{" "}
-              {data.totalKnowledgePoints > 0
+              {display.totalKnowledgePoints > 0
                 ? Math.round(
-                    (data.masteredKnowledgePoints /
-                      data.totalKnowledgePoints) *
-                      100
+                    (display.masteredKnowledgePoints / display.totalKnowledgePoints) * 100
                   )
                 : 0}
               %
             </span>
-            <span>薄弱: {data.weakPoints} 个知识点</span>
+            <span>薄弱: {display.weakPoints} 个知识点</span>
           </div>
         </div>
       </div>
 
       {/* Chapter breakdown */}
-      {data.chapterBreakdown.length > 0 && (
+      {display.chapterBreakdown.length > 0 && (
         <div className="rounded-xl bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-text-primary">
-            章节进度
-          </h3>
+          <h3 className="text-lg font-semibold text-text-primary">章节进度</h3>
           <div className="mt-4 space-y-3">
-            {data.chapterBreakdown.map((ch) => (
+            {display.chapterBreakdown.map((ch) => (
               <div key={ch.chapterId}>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-primary">{ch.title}</span>

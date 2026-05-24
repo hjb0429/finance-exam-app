@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, BarChart3 } from "lucide-react";
 import type { Question } from "@/lib/types";
-import { addOfflineAttempt, setupAutoSync, isOnline } from "@/lib/offline-store";
+import { recordAttempt, setupAutoSync } from "@/lib/local-db";
 import QuestionCard from "./QuestionCard";
 
 interface QuizSessionProps {
@@ -61,7 +61,7 @@ export default function QuizSession({
     const question = questions[currentIdx];
     if (!question) return;
 
-    let isCorrectResult: boolean;
+    let isCorrectResult = false;
 
     try {
       const res = await fetch("/api/questions/attempt", {
@@ -72,14 +72,13 @@ export default function QuizSession({
       const data = await res.json();
       isCorrectResult = data.isCorrect;
     } catch {
-      // Offline fallback: use local answer checking
-      isCorrectResult = addOfflineAttempt(
-        question.id,
-        answer,
-        question.answer,
-        question.type
-      );
+      // Offline: check answer locally
+      const { checkAnswer: localCheck } = await import("@/lib/answer-utils");
+      isCorrectResult = localCheck(answer, question.answer, question.type);
     }
+
+    // Always save to local DB for persistent history
+    recordAttempt(question.id, answer, isCorrectResult);
 
     setResults((prev) => [
       ...prev,
