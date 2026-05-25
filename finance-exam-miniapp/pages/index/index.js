@@ -1,45 +1,52 @@
 const DATA = require("../../utils/data.js");
-const OPT = ["A", "B", "C", "D", "E", "F", "G", "H"];
-const TP = {
-  single_choice: "单选",
-  multi_choice: "多选题",
-  true_false: "判断",
-  calculation: "计算题",
-};
 
 function normAnswer(raw, type) {
-  const t = raw.trim();
+  const t = (raw || "").trim();
   if (type === "true_false") {
-    if (/^(true|正确|对|是|a)$/i.test(t)) return "A";
-    if (/^(false|错误|错|否|b)$/i.test(t)) return "B";
+    if (/^(true|正确|对|是|a|A)$/.test(t)) return "A";
+    if (/^(false|错误|错|否|b|B)$/.test(t)) return "B";
     return t.toUpperCase();
   }
   if (type === "multi_choice") {
     const m = t.match(/[A-Za-z]/g);
     if (!m) return t.toUpperCase();
-    return [...new Set(m.map((l) => l.toUpperCase()))].sort().join("");
+    return [...new Set(m.map(function(l) { return l.toUpperCase(); }))].sort().join("");
   }
   return t.toUpperCase().charAt(0);
 }
 
 function checkAns(user, correct, type) {
-  let u = user.trim();
-  if (type === "multi_choice")
-    u = (u.match(/[A-Za-z]/g) || []).map((l) => l.toUpperCase()).sort().join("");
-  else u = u.toUpperCase().charAt(0);
+  var u = (user || "").trim();
+  if (type === "multi_choice") {
+    var m = u.match(/[A-Za-z]/g) || [];
+    u = m.map(function(l) { return l.toUpperCase(); }).sort().join("");
+  } else {
+    u = u.toUpperCase().charAt(0);
+  }
   return u === normAnswer(correct, type);
 }
+
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+var OPT = ["A", "B", "C", "D", "E", "F", "G", "H"];
+var TP = { single_choice: "单选", multi_choice: "多选题", true_false: "判断", calculation: "计算题" };
 
 Page({
   data: {
     tab: "home",
-    chapters: DATA.chapters.sort((a, b) => a.order - b.order),
+    chapters: DATA.chapters.sort(function(a, b) { return a.order - b.order; }),
     guide: DATA.guides.guide || null,
     changes: DATA.guides.changes || null,
     chapterOpen: {},
     sectionOpen: {},
     quizMode: null,
-    quizChapter: null,
     quizQuestions: [],
     quizIdx: 0,
     quizResults: [],
@@ -57,41 +64,57 @@ Page({
     sectionsByChapter: {},
     kpsBySection: {},
     kpsByChapter: {},
-    optLabels: OPT,
+    // Quiz display
     currentQuestion: {},
     qTypeLabel: "",
-    correctAnswer: "",
+    correctAnswerDisplay: "",
     displayOptions: [],
     correctCount: 0,
     quizRate: 0,
+    quizProgress: 0,
+    // Option states (pre-computed)
+    optionsState: [],
+    resultMsg: "",
+    resultClass: "",
+    // Chapter progress for analysis
+    chapterProgress: [],
+    masteryPercent: 0,
+    // Framework chapter list
+    frameworkChapters: [],
   },
 
-  onLoad() {
+  onLoad: function() {
     this.buildLookups();
     this.refreshStats();
   },
 
-  onShow() {
+  onShow: function() {
     this.refreshStats();
   },
 
-  buildLookups() {
-    const sbc = {};
-    const kbs = {};
-    for (const s of DATA.sections) {
+  buildLookups: function() {
+    var sbc = {};
+    var kbs = {};
+    for (var i = 0; i < DATA.sections.length; i++) {
+      var s = DATA.sections[i];
       if (!sbc[s.chapterId]) sbc[s.chapterId] = [];
       sbc[s.chapterId].push(s);
     }
-    for (const k of DATA.knowledgePoints) {
+    for (var j = 0; j < DATA.knowledgePoints.length; j++) {
+      var k = DATA.knowledgePoints[j];
       if (!kbs[k.sectionId]) kbs[k.sectionId] = [];
       kbs[k.sectionId].push(k);
     }
-    const kpbc = {};
-    for (const ch of DATA.chapters) {
+    var kpbc = {};
+    for (var ci = 0; ci < DATA.chapters.length; ci++) {
+      var ch = DATA.chapters[ci];
       kpbc[ch.id] = [];
-      const secs = (sbc[ch.id] || []).sort((a, b) => a.order - b.order);
-      for (const sec of secs) {
-        kpbc[ch.id].push(...(kbs[sec.id] || []));
+      var secs = (sbc[ch.id] || []).sort(function(a, b) { return a.order - b.order; });
+      for (var si = 0; si < secs.length; si++) {
+        var secKps = kbs[secs[si].id] || [];
+        for (var ki = 0; ki < secKps.length; ki++) {
+          kpbc[ch.id].push(secKps[ki]);
+        }
       }
     }
     this.setData({
@@ -101,91 +124,116 @@ Page({
     });
   },
 
-  refreshStats() {
-    const h = wx.getStorageSync("fe_history") || [];
+  refreshStats: function() {
+    var h = wx.getStorageSync("fe_history") || [];
+    var mastered = 0;
+    var weak = 0;
+    for (var i = 0; i < DATA.knowledgePoints.length; i++) {
+      var k = DATA.knowledgePoints[i];
+      if (k.masteryLevel === "mastered") mastered++;
+      if (k.masteryLevel === "weak") weak++;
+    }
+    var totalKp = DATA.knowledgePoints.length;
+    var masteryPercent = totalKp > 0 ? Math.round(mastered / totalKp * 100) : 0;
+
     if (h.length === 0) {
-      const mastered = DATA.knowledgePoints.filter(
-        (k) => k.masteryLevel === "mastered"
-      ).length;
-      const weak = DATA.knowledgePoints.filter(
-        (k) => k.masteryLevel === "weak"
-      ).length;
       this.setData({
         stats: { totalAttempts: 0, correctRate: 0, weakPoints: weak },
-        masteredKp: mastered,
-        weakKp: weak,
+        masteredKp: mastered, weakKp: weak, masteryPercent: masteryPercent,
       });
       return;
     }
-    const correct = h.filter((a) => a.ok).length;
-    const mastered = DATA.knowledgePoints.filter(
-      (k) => k.masteryLevel === "mastered"
-    ).length;
-    const weak = DATA.knowledgePoints.filter(
-      (k) => k.masteryLevel === "weak"
-    ).length;
+    var correct = 0;
+    for (var j = 0; j < h.length; j++) { if (h[j].ok) correct++; }
     this.setData({
       stats: {
         totalAttempts: h.length,
-        correctRate: Math.round((correct / h.length) * 100),
+        correctRate: Math.round(correct / h.length * 100),
         weakPoints: weak,
       },
-      masteredKp: mastered,
-      weakKp: weak,
+      masteredKp: mastered, weakKp: weak, masteryPercent: masteryPercent,
     });
+    this.buildChapterProgress();
   },
 
-  switchTab(e) {
-    const t = e.currentTarget.dataset.tab;
+  buildChapterProgress: function() {
+    var cp = [];
+    var chapters = this.data.chapters;
+    for (var i = 0; i < chapters.length; i++) {
+      var ch = chapters[i];
+      var kps = this.data.kpsByChapter[ch.id] || [];
+      var mastered = 0;
+      for (var j = 0; j < kps.length; j++) {
+        if (kps[j].masteryLevel === "mastered") mastered++;
+      }
+      cp.push({
+        title: ch.title,
+        mastered: mastered,
+        total: kps.length,
+        percent: kps.length > 0 ? Math.round(mastered / kps.length * 100) : 0,
+      });
+    }
+    this.setData({ chapterProgress: cp });
+  },
+
+  switchTab: function(e) {
+    var t = e.currentTarget.dataset.tab;
     this.setData({ tab: t });
-    if (t === "analysis" || t === "home") this.refreshStats();
+    if (t === "analysis" || t === "home") {
+      this.refreshStats();
+      this.buildChapterProgress();
+    }
   },
 
-  toggleChapter(e) {
-    const id = e.currentTarget.dataset.id;
-    const co = { ...this.data.chapterOpen };
+  toggleChapter: function(e) {
+    var id = e.currentTarget.dataset.id;
+    var co = this.data.chapterOpen;
     co[id] = !co[id];
     this.setData({ chapterOpen: co });
   },
 
-  toggleSection(e) {
-    const id = e.currentTarget.dataset.id;
-    const so = { ...this.data.sectionOpen };
+  toggleSection: function(e) {
+    var id = e.currentTarget.dataset.id;
+    var so = this.data.sectionOpen;
     so[id] = !so[id];
     this.setData({ sectionOpen: so });
   },
 
   // Quiz
-  startQuiz(e) {
-    const mode = e.currentTarget.dataset.mode;
-    const chId = e.currentTarget.dataset.id;
-    let pool = [];
+  startQuiz: function(e) {
+    var mode = e.currentTarget.dataset.mode;
+    var chId = e.currentTarget.dataset.id;
+    var pool = [];
 
     if (mode === "chapter" && chId) {
-      const secIds = (this._sbc[chId] || []).map((s) => s.id);
-      const kpIds = DATA.knowledgePoints
-        .filter((k) => secIds.includes(k.sectionId))
-        .map((k) => k.id);
-      pool = DATA.questions.filter((q) => kpIds.includes(q.knowledgePointId));
+      var sbc = this.data.sectionsByChapter;
+      var secIds = (sbc[chId] || []).map(function(s) { return s.id; });
+      var kpIds = [];
+      for (var i = 0; i < DATA.knowledgePoints.length; i++) {
+        if (secIds.indexOf(DATA.knowledgePoints[i].sectionId) > -1) kpIds.push(DATA.knowledgePoints[i].id);
+      }
+      for (var j = 0; j < DATA.questions.length; j++) {
+        if (kpIds.indexOf(DATA.questions[j].knowledgePointId) > -1) pool.push(DATA.questions[j]);
+      }
     } else if (mode === "weak") {
-      const weakIds = DATA.knowledgePoints
-        .filter((k) => k.masteryLevel === "weak")
-        .map((k) => k.id);
-      pool = DATA.questions.filter((q) => weakIds.includes(q.knowledgePointId));
-      if (pool.length === 0) pool = DATA.questions;
+      var weakIds = [];
+      for (var k = 0; k < DATA.knowledgePoints.length; k++) {
+        if (DATA.knowledgePoints[k].masteryLevel === "weak") weakIds.push(DATA.knowledgePoints[k].id);
+      }
+      for (var l = 0; l < DATA.questions.length; l++) {
+        if (weakIds.indexOf(DATA.questions[l].knowledgePointId) > -1) pool.push(DATA.questions[l]);
+      }
+      if (pool.length === 0) pool = DATA.questions.slice();
     } else {
-      pool = [...DATA.questions];
+      pool = DATA.questions.slice();
     }
 
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
+    pool = shuffle(pool);
+    var questions = pool.slice(0, 30);
+    var q = questions[0] || {};
 
-    const questions = pool.slice(0, 30);
     this.setData({
       quizMode: mode,
-      quizChapter: chId,
       quizQuestions: questions,
       quizIdx: 0,
       quizResults: [],
@@ -193,124 +241,149 @@ Page({
       quizSubmitted: false,
       quizCorrect: false,
       quizFinished: false,
-      currentQuestion: questions[0] || {},
-      qTypeLabel: questions[0] ? (TP[questions[0].type] || questions[0].type) : "",
-      correctAnswer: questions[0] ? normAnswer(questions[0].answer, questions[0].type) : "",
-      displayOptions: questions[0] ? (questions[0].options && questions[0].options.length > 0 ? questions[0].options : ["A. 正确", "B. 错误"]) : [],
+      currentQuestion: q,
+      qTypeLabel: TP[q.type] || q.type || "",
+      correctAnswerDisplay: normAnswer(q.answer || "", q.type || ""),
+      displayOptions: (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"],
       correctCount: 0,
       quizRate: 0,
+      quizProgress: 0,
+      optionsState: [],
+      resultMsg: "",
+      resultClass: "",
     });
   },
 
-  quitQuiz() {
+  quitQuiz: function() {
     this.setData({
-      quizMode: null,
-      quizFinished: false,
-      quizSubmitted: false,
-      quizSelected: [],
-      currentQuestion: {},
-      quizQuestions: [],
-      quizResults: [],
-      quizIdx: 0,
+      quizMode: null, quizFinished: false, quizSubmitted: false, quizSelected: [],
+      quizQuestions: [], quizResults: [], quizIdx: 0,
     });
   },
 
-  selectOption(e) {
+  selectOption: function(e) {
     if (this.data.quizSubmitted) return;
-    const label = e.currentTarget.dataset.label;
-    const q = this.data.quizQuestions[this.data.quizIdx];
-    let sel = [...this.data.quizSelected];
+    var label = e.currentTarget.dataset.label;
+    var q = this.data.quizQuestions[this.data.quizIdx];
+    var sel = this.data.quizSelected.slice();
     if (q.type === "multi_choice") {
-      sel = sel.includes(label) ? sel.filter((l) => l !== label) : [...sel, label];
+      var idx = sel.indexOf(label);
+      if (idx > -1) sel.splice(idx, 1); else sel.push(label);
     } else {
       sel = [label];
     }
-    this.setData({ quizSelected: sel });
+    // Compute option states
+    var states = this.computeOptionStates(q, sel, false, "");
+    this.setData({ quizSelected: sel, optionsState: states });
   },
 
-  submitAnswer() {
-    if (this.data.quizSelected.length === 0) return;
-    const q = this.data.quizQuestions[this.data.quizIdx];
-    const isMulti = q.type === "multi_choice";
-    const ua = isMulti ? this.data.quizSelected.sort().join(",") : this.data.quizSelected[0];
-    const ok = checkAns(ua, q.answer, q.type);
-    const results = [...this.data.quizResults, { qid: q.id, ok }];
+  computeOptionStates: function(q, selected, submitted, correctAnswer) {
+    var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
+    var states = [];
+    for (var i = 0; i < opts.length; i++) {
+      var label = OPT[i];
+      var state = "";
+      if (submitted) {
+        if (correctAnswer.indexOf(label) > -1) state = "correct";
+        else if (selected.indexOf(label) > -1) state = "wrong";
+      } else {
+        if (selected.indexOf(label) > -1) state = "selected";
+      }
+      states.push(state);
+    }
+    return states;
+  },
 
-    // Save to wx storage
-    const h = wx.getStorageSync("fe_history") || [];
-    h.push({ qid: q.id, ans: ua, ok, ts: new Date().toISOString() });
+  submitAnswer: function() {
+    if (this.data.quizSelected.length === 0) return;
+    var q = this.data.quizQuestions[this.data.quizIdx];
+    var isMulti = q.type === "multi_choice";
+    var ua = isMulti ? this.data.quizSelected.sort().join(",") : this.data.quizSelected[0];
+    var ok = checkAns(ua, q.answer, q.type);
+    var results = this.data.quizResults.slice();
+    results.push({ qid: q.id, ok: ok });
+    var correctCount = 0;
+    for (var i = 0; i < results.length; i++) { if (results[i].ok) correctCount++; }
+    var quizRate = results.length > 0 ? Math.round(correctCount / results.length * 100) : 0;
+
+    // Save
+    var h = wx.getStorageSync("fe_history") || [];
+    h.push({ qid: q.id, ans: ua, ok: ok, ts: new Date().toISOString() });
     if (h.length > 1000) h.splice(0, h.length - 1000);
     wx.setStorageSync("fe_history", h);
 
+    var ca = normAnswer(q.answer || "", q.type || "");
+    var states = this.computeOptionStates(q, this.data.quizSelected, true, ca);
+    var msg = ok ? "✅ 回答正确!" : "❌ 回答错误，正确答案是 " + ca;
+
     this.setData({
-      quizSubmitted: true,
-      quizCorrect: ok,
-      quizResults: results,
-      correctCount: results.filter((r) => r.ok).length,
-      quizRate: Math.round((results.filter((r) => r.ok).length / results.length) * 100),
+      quizSubmitted: true, quizCorrect: ok, quizResults: results,
+      correctCount: correctCount, quizRate: quizRate,
+      optionsState: states, resultMsg: msg,
+      resultClass: ok ? "result-correct" : "result-wrong",
     });
   },
 
-  prevQuestion() {
+  prevQuestion: function() {
     if (this.data.quizIdx > 0) {
-      const idx = this.data.quizIdx - 1;
-      const q = this.data.quizQuestions[idx];
-      const prev = this.data.quizResults[idx];
+      var idx = this.data.quizIdx - 1;
+      var q = this.data.quizQuestions[idx];
+      var prev = this.data.quizResults[idx];
+      var ca = normAnswer(q.answer || "", q.type || "");
+      var states = this.computeOptionStates(q, [], true, ca);
       this.setData({
-        quizIdx: idx,
-        quizSubmitted: true,
-        quizCorrect: prev ? prev.ok : false,
-        quizSelected: [],
-        currentQuestion: q,
-        qTypeLabel: q ? (TP[q.type] || q.type) : "",
-        correctAnswer: q ? normAnswer(q.answer, q.type) : "",
-        displayOptions: q ? (q.options && q.options.length > 0 ? q.options : ["A. 正确", "B. 错误"]) : [],
+        quizIdx: idx, quizSubmitted: true, quizCorrect: prev ? prev.ok : false,
+        quizSelected: [], currentQuestion: q,
+        qTypeLabel: TP[q.type] || q.type || "",
+        correctAnswerDisplay: ca,
+        displayOptions: (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"],
+        optionsState: states, resultMsg: "",
+        resultClass: "",
       });
     }
   },
 
-  nextQuestion() {
+  nextQuestion: function() {
     if (this.data.quizIdx < this.data.quizQuestions.length - 1) {
-      const idx = this.data.quizIdx + 1;
-      const q = this.data.quizQuestions[idx];
+      var idx = this.data.quizIdx + 1;
+      var q = this.data.quizQuestions[idx];
       this.setData({
-        quizIdx: idx,
-        quizSubmitted: false,
-        quizCorrect: false,
-        quizSelected: [],
-        currentQuestion: q,
-        qTypeLabel: q ? (TP[q.type] || q.type) : "",
-        correctAnswer: q ? normAnswer(q.answer, q.type) : "",
-        displayOptions: q ? (q.options && q.options.length > 0 ? q.options : ["A. 正确", "B. 错误"]) : [],
+        quizIdx: idx, quizSubmitted: false, quizCorrect: false,
+        quizSelected: [], currentQuestion: q,
+        qTypeLabel: TP[q.type] || q.type || "",
+        correctAnswerDisplay: "",
+        displayOptions: (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"],
+        optionsState: [], resultMsg: "", resultClass: "",
+        quizProgress: Math.round((idx) / this.data.quizQuestions.length * 100),
       });
     } else if (this.data.quizSubmitted) {
-      this.setData({ quizFinished: true });
+      this.setData({ quizFinished: true, quizProgress: 100 });
     }
   },
 
-  retryQuiz() {
+  retryQuiz: function() {
+    var mode = this.data.quizMode;
+    var chId = null;
     this.setData({ quizFinished: false, quizMode: null });
-    const mode = this.data.quizMode;
-    const chId = this.data.quizChapter;
-    this.startQuiz({ currentTarget: { dataset: { mode, id: chId } } });
+    this.startQuiz({ currentTarget: { dataset: { mode: mode, id: chId } } });
   },
 
   // Search
-  doSearch(e) {
-    const q = e.detail.value;
+  doSearch: function(e) {
+    var q = e.detail.value;
     this.setData({ searchQuery: q });
-    if (!q.trim()) {
-      this.setData({ searchKps: [], searchQs: [] });
-      return;
+    if (!q.trim()) { this.setData({ searchKps: [], searchQs: [] }); return; }
+    var lower = q.toLowerCase();
+    var kps = [];
+    var qs = [];
+    for (var i = 0; i < DATA.knowledgePoints.length && kps.length < 20; i++) {
+      var k = DATA.knowledgePoints[i];
+      if (k.title.toLowerCase().indexOf(lower) > -1 || k.content.toLowerCase().indexOf(lower) > -1) kps.push(k);
     }
-    const lower = q.toLowerCase();
-    const kps = DATA.knowledgePoints
-      .filter((k) => k.title.toLowerCase().includes(lower) || k.content.toLowerCase().includes(lower))
-      .slice(0, 20);
-    const qs = DATA.questions
-      .filter((q) => q.stem.toLowerCase().includes(lower) || (q.analysis || "").toLowerCase().includes(lower))
-      .slice(0, 20);
+    for (var j = 0; j < DATA.questions.length && qs.length < 20; j++) {
+      var qu = DATA.questions[j];
+      if (qu.stem.toLowerCase().indexOf(lower) > -1 || (qu.analysis || "").toLowerCase().indexOf(lower) > -1) qs.push(qu);
+    }
     this.setData({ searchKps: kps, searchQs: qs });
   },
-
 });

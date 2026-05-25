@@ -63,6 +63,7 @@ page{background:#F0F7FF;font-size:14px;color:#212121;padding-bottom:70px}
 .q-stem-short{font-size:13px;margin-top:4px;color:#333}
 
 .option{display:block;width:100%;text-align:left;padding:10px 14px;margin:4px 0;border:1.5px solid #E3F2FD;border-radius:10px;background:#fff;font-size:13px;box-sizing:border-box}
+.option-normal{border-color:#E3F2FD;background:#fff}
 .option-selected{border-color:#1976D2;background:#E3F2FD}
 .option-correct{border-color:#4CAF50;background:#E8F5E9}
 .option-wrong{border-color:#F44336;background:#FFEBEE}

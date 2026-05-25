@@ -1,40 +1,26 @@
-<!-- 中级财务管理 - 首页 -->
+<!-- 首页 -->
 <view class="container" wx:if="{{tab==='home'}}">
   <view class="banner">
     <view class="banner-title">{{stats.totalAttempts>0?'欢迎回来':'开始学习吧'}}</view>
     <view class="banner-sub">中级财务管理 · 2026考季智能备考</view>
   </view>
-
   <view class="stat-grid">
     <view class="stat-card"><view class="stat-num">{{stats.totalAttempts}}</view><view class="stat-lbl">做题总数</view></view>
     <view class="stat-card"><view class="stat-num">{{stats.correctRate}}%</view><view class="stat-lbl">正确率</view></view>
     <view class="stat-card"><view class="stat-num">586</view><view class="stat-lbl">题库总量</view></view>
     <view class="stat-card"><view class="stat-num">{{stats.weakPoints}}</view><view class="stat-lbl">薄弱点</view></view>
   </view>
-
   <view class="card">
     <view class="card-title">知识掌握概览</view>
-    <view class="progress-bar"><view class="progress-fill" style="width:{{totalKp>0?masteredKp/totalKp*100:0}}%"></view></view>
-    <view class="progress-legend">
-      <text>● 已掌握 {{masteredKp}}</text>
-      <text>● 薄弱 {{weakKp}}</text>
-      <text>● 未学 {{totalKp-masteredKp-weakKp}}</text>
-    </view>
+    <view class="progress-bar"><view class="progress-fill" style="width:{{masteryPercent}}%"></view></view>
+    <view class="progress-legend"><text>● 已掌握 {{masteredKp}}</text><text>● 薄弱 {{weakKp}}</text><text>● 未学 {{totalKp-masteredKp-weakKp}}</text></view>
   </view>
-
-  <view class="card">
-    <view class="card-title">📋 2026 备考指南</view>
-    <block wx:if="{{guide}}">
-      <view class="guide-item" wx:for="{{guide.keyPoints}}" wx:key="*this" wx:for-item="kp">{{kp}}</view>
-    </block>
+  <view class="card"><view class="card-title">📋 2026 备考指南</view>
+    <block wx:if="{{guide}}"><view class="guide-item" wx:for="{{guide.keyPoints}}" wx:key="*this" wx:for-item="kp">{{kp}}</view></block>
     <view class="empty-text" wx:else>暂无备考指南数据</view>
   </view>
-
-  <view class="card">
-    <view class="card-title">📝 2026 教材变动</view>
-    <block wx:if="{{changes}}">
-      <view class="guide-item" wx:for="{{changes.keyPoints}}" wx:key="*this" wx:for-item="kp">{{kp}}</view>
-    </block>
+  <view class="card"><view class="card-title">📝 2026 教材变动</view>
+    <block wx:if="{{changes}}"><view class="guide-item" wx:for="{{changes.keyPoints}}" wx:key="*this" wx:for-item="kp">{{kp}}</view></block>
     <view class="empty-text" wx:else>暂无教材变动数据</view>
   </view>
 </view>
@@ -43,15 +29,15 @@
 <view class="container" wx:if="{{tab==='framework'}}">
   <view class="section-title">知识框架 <text class="sub">共 {{chapters.length}} 章</text></view>
   <block wx:for="{{chapters}}" wx:key="id" wx:for-item="ch">
-    <view class="tree-node" data-id="{{ch.id}}" bindtap="toggleChapter">
-      <view class="tree-row">
+    <view class="tree-node">
+      <view class="tree-row" bindtap="toggleChapter" data-id="{{ch.id}}">
         <text class="arrow {{chapterOpen[ch.id]?'open':''}}">▶</text>
         <text class="tree-label bold">{{ch.title}}</text>
       </view>
       <view class="tree-children {{chapterOpen[ch.id]?'open':''}}">
         <block wx:for="{{sectionsByChapter[ch.id]}}" wx:key="id" wx:for-item="sec">
-          <view class="tree-node" data-id="{{sec.id}}" bindtap="toggleSection">
-            <view class="tree-row tree-row-indent">
+          <view class="tree-node">
+            <view class="tree-row tree-row-indent" bindtap="toggleSection" data-id="{{sec.id}}">
               <text class="arrow {{sectionOpen[sec.id]?'open':''}}">▶</text>
               <text class="tree-label">{{sec.title}} ({{kpsBySection[sec.id].length}}个知识点)</text>
             </view>
@@ -69,45 +55,30 @@
   <view class="footer-text">共 {{totalKp}} 个知识点</view>
 </view>
 
-<!-- 刷题练习 -->
+<!-- 刷题 -->
 <view class="container" wx:if="{{tab==='practice'}}">
   <block wx:if="{{!quizMode}}">
     <view class="section-title">刷题练习</view>
     <view class="mode-grid">
-      <view class="mode-card" bindtap="startQuiz" data-mode="random">
-        <view class="mode-icon">🎲</view>
-        <view class="mode-title">随机练习</view>
-        <view class="mode-desc">随机抽30题</view>
-      </view>
-      <view class="mode-card" bindtap="startQuiz" data-mode="weak">
-        <view class="mode-icon">🎯</view>
-        <view class="mode-title">薄弱点专练</view>
-        <view class="mode-desc">专攻薄弱环节</view>
-      </view>
+      <view class="mode-card" bindtap="startQuiz" data-mode="random"><view class="mode-icon">🎲</view><view class="mode-title">随机练习</view><view class="mode-desc">随机抽30题</view></view>
+      <view class="mode-card" bindtap="startQuiz" data-mode="weak"><view class="mode-icon">🎯</view><view class="mode-title">薄弱点专练</view><view class="mode-desc">专攻薄弱环节</view></view>
     </view>
-    <view class="card">
-      <view class="card-title">按章练习</view>
+    <view class="card"><view class="card-title">按章练习</view>
       <view class="chapter-btn" wx:for="{{chapters}}" wx:key="id" wx:for-item="ch" bindtap="startQuiz" data-mode="chapter" data-id="{{ch.id}}">{{ch.title}}</view>
     </view>
   </block>
   <block wx:else>
     <block wx:if="{{!quizFinished}}">
-      <view class="quiz-nav">
-        <button class="nav-btn" bindtap="quitQuiz">← 退出</button>
-        <text class="nav-text">{{quizIdx+1}}/{{quizQuestions.length}}</text>
-        <text class="nav-text">✓ {{correctCount}}</text>
-      </view>
-      <view class="progress-bar"><view class="progress-fill" style="width:{{quizIdx/quizQuestions.length*100}}%"></view></view>
+      <view class="quiz-nav"><button class="nav-btn" bindtap="quitQuiz">← 退出</button><text class="nav-text">{{quizIdx+1}}/{{quizQuestions.length}}</text><text class="nav-text">✓ {{correctCount}}</text></view>
+      <view class="progress-bar"><view class="progress-fill" style="width:{{quizProgress}}%"></view></view>
       <view class="card">
         <view class="q-type">{{qTypeLabel}}</view>
         <view class="q-stem">{{currentQuestion.stem}}</view>
         <block wx:for="{{displayOptions}}" wx:key="*this" wx:for-item="opt" wx:for-index="oi">
-          <view class="option {{quizSubmitted?(correctAnswer.includes(optLabels[oi])?'option-correct':(quizSelected.indexOf(optLabels[oi])>-1?'option-wrong':'')):(quizSelected.indexOf(optLabels[oi])>-1?'option-selected':'')}}" bindtap="selectOption" data-label="{{optLabels[oi]}}">{{opt}}</view>
+          <view class="option option-{{optionsState[oi]||'normal'}}" bindtap="selectOption" data-label="{{optLabels[oi]}}">{{opt}}</view>
         </block>
-        <button class="submit-btn" wx:if="{{!quizSubmitted}}" bindtap="submitAnswer" disabled="{{quizSelected.length===0}}">提交答案</button>
-        <view wx:if="{{quizSubmitted}}" class="result-banner {{quizCorrect?'result-correct':'result-wrong'}}">
-          {{quizCorrect?'✅ 回答正确!':'❌ 回答错误，正确答案是 '+correctAnswer}}
-        </view>
+        <button class="submit-btn" wx:if="{{!quizSubmitted}}" bindtap="submitAnswer">提交答案</button>
+        <view wx:if="{{quizSubmitted}}" class="result-banner {{resultClass}}">{{resultMsg}}</view>
         <view wx:if="{{quizSubmitted}}" class="analysis-text">{{currentQuestion.analysis}}</view>
       </view>
       <view class="quiz-btns">
@@ -116,25 +87,17 @@
       </view>
     </block>
     <block wx:else>
-      <view class="card" style="text-align:center">
-        <view class="result-icon">{{quizRate>=80?'🎉':quizRate>=60?'👍':'💪'}}</view>
-        <view class="card-title">练习完成!</view>
-        <view class="stat-grid">
-          <view class="stat-card"><view class="stat-num">{{quizResults.length}}</view><view class="stat-lbl">总题数</view></view>
-          <view class="stat-card"><view class="stat-num">{{correctCount}}</view><view class="stat-lbl">正确</view></view>
-        </view>
+      <view class="card" style="text-align:center"><view class="result-icon">{{quizRate>=80?'🎉':quizRate>=60?'👍':'💪'}}</view><view class="card-title">练习完成!</view>
+        <view class="stat-grid"><view class="stat-card"><view class="stat-num">{{quizResults.length}}</view><view class="stat-lbl">总题数</view></view><view class="stat-card"><view class="stat-num">{{correctCount}}</view><view class="stat-lbl">正确</view></view></view>
         <view class="progress-bar"><view class="progress-fill" style="width:{{quizRate}}%"></view></view>
         <view style="font-size:13px;color:#757575;margin-top:6px">正确率 {{quizRate}}%</view>
-        <view style="margin-top:16px;display:flex;gap:8px">
-          <button class="submit-btn" style="flex:1" bindtap="retryQuiz">再来一组</button>
-          <button class="nav-btn" style="flex:1" bindtap="quitQuiz">返回</button>
-        </view>
+        <view style="margin-top:16px;display:flex;gap:8px"><button class="submit-btn" style="flex:1" bindtap="retryQuiz">再来一组</button><button class="nav-btn" style="flex:1" bindtap="quitQuiz">返回</button></view>
       </view>
     </block>
   </block>
 </view>
 
-<!-- 学习分析 -->
+<!-- 分析 -->
 <view class="container" wx:if="{{tab==='analysis'}}">
   <view class="section-title">学习分析</view>
   <block wx:if="{{stats.totalAttempts>0}}">
@@ -144,74 +107,49 @@
       <view class="stat-card"><view class="stat-num">{{masteredKp}}/{{totalKp}}</view><view class="stat-lbl">已掌握知识点</view></view>
       <view class="stat-card"><view class="stat-num">{{weakKp}}</view><view class="stat-lbl">薄弱点</view></view>
     </view>
-    <view class="card">
-      <view class="card-title">整体掌握度</view>
-      <view class="progress-bar"><view class="progress-fill" style="width:{{totalKp>0?masteredKp/totalKp*100:0}}%"></view></view>
-      <view style="font-size:11px;color:#757575;margin-top:6px">已掌握: {{totalKp>0?(masteredKp/totalKp*100).toFixed(0):0}}% | 薄弱: {{weakKp}} 个</view>
+    <view class="card"><view class="card-title">整体掌握度</view>
+      <view class="progress-bar"><view class="progress-fill" style="width:{{masteryPercent}}%"></view></view>
+      <view style="font-size:11px;color:#757575;margin-top:6px">已掌握: {{masteryPercent}}% | 薄弱: {{weakKp}} 个</view>
     </view>
-    <view class="card">
-      <view class="card-title">章节进度</view>
-      <view wx:for="{{chapters}}" wx:key="id" wx:for-item="ch" style="margin-bottom:10px">
-        <view class="chap-row"><text>{{ch.title}}</text><text style="color:#757575;font-size:11px">{{kpsByChapter[ch.id].filter(function(k){return k.masteryLevel==='mastered'}).length}}/{{kpsByChapter[ch.id].length}}</text></view>
-        <view class="progress-bar"><view class="progress-fill" style="width:{{kpsByChapter[ch.id].length>0?kpsByChapter[ch.id].filter(function(k){return k.masteryLevel==='mastered'}).length/kpsByChapter[ch.id].length*100:0}}%"></view></view>
+    <view class="card"><view class="card-title">章节进度</view>
+      <view wx:for="{{chapterProgress}}" wx:key="title" wx:for-item="cp">
+        <view class="chap-row"><text>{{cp.title}}</text><text style="color:#757575;font-size:11px">{{cp.mastered}}/{{cp.total}}</text></view>
+        <view class="progress-bar"><view class="progress-fill" style="width:{{cp.percent}}%"></view></view>
       </view>
     </view>
   </block>
   <view class="card" style="text-align:center" wx:else>
     <view style="font-size:40px;margin-bottom:12px">📊</view>
-    <view class="card-title">完成一定量的题目后</view>
-    <view class="empty-text">系统将自动分析你的知识掌握情况</view>
+    <view class="card-title">完成一定量的题目后</view><view class="empty-text">系统将自动分析你的知识掌握情况</view>
   </view>
 </view>
 
 <!-- 搜索 -->
 <view class="container" wx:if="{{tab==='search'}}">
   <view class="section-title">搜索</view>
-  <input class="search-input" placeholder="搜索知识点或题目..." value="{{searchQuery}}" bindinput="doSearch" />
+  <input class="search-input" placeholder="搜索知识点或题目..." value="{{searchQuery}}" bindinput="doSearch"/>
   <block wx:if="{{searchQuery}}">
-    <view wx:if="{{searchKps.length===0&&searchQs.length===0}}" class="card" style="text-align:center">
-      <view class="empty-text">未找到与 "{{searchQuery}}" 相关的结果</view>
-    </view>
-    <block wx:if="{{searchKps.length>0}}">
-      <view class="sub-title">📚 知识点 ({{searchKps.length}})</view>
-      <view class="card search-card" wx:for="{{searchKps}}" wx:key="id" wx:for-item="kp" bindtap="switchTab" data-tab="framework">
-        <view class="kp-title">{{kp.title}}</view>
-        <view class="kp-content">{{kp.content}}</view>
-      </view>
+    <view wx:if="{{searchKps.length===0&&searchQs.length===0}}" class="card" style="text-align:center"><view class="empty-text">未找到结果</view></view>
+    <block wx:if="{{searchKps.length>0}}"><view class="sub-title">📚 知识点 ({{searchKps.length}})</view>
+      <view class="card search-card" wx:for="{{searchKps}}" wx:key="id" wx:for-item="kp" bindtap="switchTab" data-tab="framework"><view class="kp-title">{{kp.title}}</view><view class="kp-content">{{kp.content}}</view></view>
     </block>
-    <block wx:if="{{searchQs.length>0}}">
-      <view class="sub-title">❓ 题目 ({{searchQs.length}})</view>
-      <view class="card" wx:for="{{searchQs}}" wx:key="id" wx:for-item="q">
-        <view class="q-type">{{q.type==='single_choice'?'单选':q.type==='multi_choice'?'多选':q.type==='true_false'?'判断':'计算'}}</view>
-        <view class="q-stem-short">{{q.stem}}</view>
-      </view>
+    <block wx:if="{{searchQs.length>0}}"><view class="sub-title">❓ 题目 ({{searchQs.length}})</view>
+      <view class="card" wx:for="{{searchQs}}" wx:key="id" wx:for-item="q"><view class="q-type">{{q.type==='single_choice'?'单选':q.type==='multi_choice'?'多选':q.type==='true_false'?'判断':'计算'}}</view><view class="q-stem-short">{{q.stem}}</view></view>
     </block>
   </block>
-  <view class="card" style="text-align:center" wx:else>
-    <view style="font-size:32px;color:#90CAF9">🔍</view>
-    <view class="empty-text">输入关键词搜索</view>
-  </view>
+  <view class="card" style="text-align:center" wx:else><view style="font-size:32px;color:#90CAF9">🔍</view><view class="empty-text">输入关键词搜索</view></view>
 </view>
 
 <!-- 后台 -->
 <view class="container" wx:if="{{tab==='admin'}}">
   <view class="section-title">后台管理</view>
-  <view class="card" style="text-align:center">
-    <view style="font-size:40px;margin-bottom:12px">🔧</view>
-    <view class="card-title">PDF 资料上传与 AI 解析</view>
-    <view class="empty-text">需要电脑端运行开发服务器</view>
-    <view class="admin-steps">
-      <text>操作步骤：\n</text>
-      <text>1. VS Code → 打开项目\n</text>
-      <text>2. 终端：cd finance-exam-app && npm run dev\n</text>
-      <text>3. 打开 http://localhost:3000/admin\n</text>
-      <text>4. 上传PDF → AI解析 → 重新构建离线版</text>
-    </view>
+  <view class="card" style="text-align:center"><view style="font-size:40px;margin-bottom:12px">🔧</view><view class="card-title">PDF 资料上传与 AI 解析</view><view class="empty-text">需要电脑端运行开发服务器</view>
+    <view class="admin-steps"><text>操作步骤：\n1. VS Code → 打开项目\n2. 终端：cd finance-exam-app && npm run dev\n3. 打开 http://localhost:3000/admin\n4. 上传PDF → AI解析 → 重新构建</text></view>
     <view class="empty-text" style="margin-top:12px">✅ 当前已导入：10章 · 146知识点 · 586题</view>
   </view>
 </view>
 
-<!-- Bottom tab bar -->
+<!-- Tab bar -->
 <view class="tabbar">
   <view class="tab-item {{tab==='home'?'tab-active':''}}" bindtap="switchTab" data-tab="home">🏠<text>首页</text></view>
   <view class="tab-item {{tab==='framework'?'tab-active':''}}" bindtap="switchTab" data-tab="framework">📚<text>框架</text></view>
