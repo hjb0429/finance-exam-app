@@ -1,16 +1,23 @@
-﻿const DATA = require("../../utils/data.js");
+﻿var DATA = require("../../utils/data.js");
+var OPT = ["A", "B", "C", "D", "E", "F", "G", "H"];
+var TP = { single_choice: "单选", multi_choice: "多选", true_false: "判断", calculation: "计算" };
 
 function normAnswer(raw, type) {
-  const t = (raw || "").trim();
+  var t = (raw || "").trim();
   if (type === "true_false") {
     if (/^(true|正确|对|是|a|A)$/.test(t)) return "A";
     if (/^(false|错误|错|否|b|B)$/.test(t)) return "B";
     return t.toUpperCase();
   }
   if (type === "multi_choice") {
-    const m = t.match(/[A-Za-z]/g);
+    var m = t.match(/[A-Za-z]/g);
     if (!m) return t.toUpperCase();
-    return [...new Set(m.map(function(l) { return l.toUpperCase(); }))].sort().join("");
+    var seen = {}; var letters = [];
+    for (var i = 0; i < m.length; i++) {
+      var l = m[i].toUpperCase();
+      if (!seen[l]) { seen[l] = true; letters.push(l); }
+    }
+    return letters.sort().join("");
   }
   return t.toUpperCase().charAt(0);
 }
@@ -19,7 +26,12 @@ function checkAns(user, correct, type) {
   var u = (user || "").trim();
   if (type === "multi_choice") {
     var m = u.match(/[A-Za-z]/g) || [];
-    u = m.map(function(l) { return l.toUpperCase(); }).sort().join("");
+    var seen = {}; var letters = [];
+    for (var i = 0; i < m.length; i++) {
+      var l = m[i].toUpperCase();
+      if (!seen[l]) { seen[l] = true; letters.push(l); }
+    }
+    u = letters.sort().join("");
   } else {
     u = u.toUpperCase().charAt(0);
   }
@@ -35,9 +47,6 @@ function shuffle(arr) {
   return a;
 }
 
-var OPT = ["A", "B", "C", "D", "E", "F", "G", "H"];
-var TP = { single_choice: "单选", multi_choice: "多选题", true_false: "判断", calculation: "计算题" };
-
 Page({
   data: {
     tab: "home",
@@ -46,6 +55,8 @@ Page({
     changes: DATA.guides.changes || null,
     chapterOpen: {},
     sectionOpen: {},
+    kpOpen: {},
+    kpDetail: {},
     quizMode: null,
     quizQuestions: [],
     quizIdx: 0,
@@ -64,7 +75,6 @@ Page({
     sectionsByChapter: {},
     kpsBySection: {},
     kpsByChapter: {},
-    // Quiz display
     currentQuestion: {},
     qTypeLabel: "",
     correctAnswerDisplay: "",
@@ -72,15 +82,12 @@ Page({
     correctCount: 0,
     quizRate: 0,
     quizProgress: 0,
-    // Option states (pre-computed)
-    optionsState: [],
+    optStates: [],
     resultMsg: "",
     resultClass: "",
-    // Chapter progress for analysis
     chapterProgress: [],
     masteryPercent: 0,
-    // Framework chapter list
-    frameworkChapters: [],
+    optLabels: OPT,
   },
 
   onLoad: function() {
@@ -95,83 +102,58 @@ Page({
   buildLookups: function() {
     var sbc = {};
     var kbs = {};
+    var kpDetail = {};
     for (var i = 0; i < DATA.sections.length; i++) {
       var s = DATA.sections[i];
       if (!sbc[s.chapterId]) sbc[s.chapterId] = [];
-      sbc[s.chapterId].push(s);
+      sbc[s.chapterId].push({ id: s.id, title: s.title, order: s.order });
     }
     for (var j = 0; j < DATA.knowledgePoints.length; j++) {
       var k = DATA.knowledgePoints[j];
       if (!kbs[k.sectionId]) kbs[k.sectionId] = [];
       kbs[k.sectionId].push(k);
+      kpDetail[k.id] = k.content;
     }
     var kpbc = {};
     for (var ci = 0; ci < DATA.chapters.length; ci++) {
       var ch = DATA.chapters[ci];
       kpbc[ch.id] = [];
-      var secs = (sbc[ch.id] || []).sort(function(a, b) { return a.order - b.order; });
+      var secs = sbc[ch.id] || [];
       for (var si = 0; si < secs.length; si++) {
         var secKps = kbs[secs[si].id] || [];
-        for (var ki = 0; ki < secKps.length; ki++) {
-          kpbc[ch.id].push(secKps[ki]);
-        }
+        for (var ki = 0; ki < secKps.length; ki++) kpbc[ch.id].push(secKps[ki]);
       }
     }
-    this.setData({
-      sectionsByChapter: sbc,
-      kpsBySection: kbs,
-      kpsByChapter: kpbc,
-    });
+    this.setData({ sectionsByChapter: sbc, kpsBySection: kbs, kpsByChapter: kpbc, kpDetail: kpDetail });
   },
 
   refreshStats: function() {
     var h = wx.getStorageSync("fe_history") || [];
-    var mastered = 0;
-    var weak = 0;
+    var mastered = 0, weak = 0;
     for (var i = 0; i < DATA.knowledgePoints.length; i++) {
-      var k = DATA.knowledgePoints[i];
-      if (k.masteryLevel === "mastered") mastered++;
-      if (k.masteryLevel === "weak") weak++;
+      if (DATA.knowledgePoints[i].masteryLevel === "mastered") mastered++;
+      if (DATA.knowledgePoints[i].masteryLevel === "weak") weak++;
     }
-    var totalKp = DATA.knowledgePoints.length;
-    var masteryPercent = totalKp > 0 ? Math.round(mastered / totalKp * 100) : 0;
-
+    var mp = DATA.knowledgePoints.length > 0 ? Math.round(mastered / DATA.knowledgePoints.length * 100) : 0;
     if (h.length === 0) {
-      this.setData({
-        stats: { totalAttempts: 0, correctRate: 0, weakPoints: weak },
-        masteredKp: mastered, weakKp: weak, masteryPercent: masteryPercent,
-      });
+      this.setData({ stats: { totalAttempts: 0, correctRate: 0, weakPoints: weak }, masteredKp: mastered, weakKp: weak, masteryPercent: mp });
+      this.buildChapterProgress();
       return;
     }
     var correct = 0;
     for (var j = 0; j < h.length; j++) { if (h[j].ok) correct++; }
-    this.setData({
-      stats: {
-        totalAttempts: h.length,
-        correctRate: Math.round(correct / h.length * 100),
-        weakPoints: weak,
-      },
-      masteredKp: mastered, weakKp: weak, masteryPercent: masteryPercent,
-    });
+    this.setData({ stats: { totalAttempts: h.length, correctRate: Math.round(correct / h.length * 100), weakPoints: weak }, masteredKp: mastered, weakKp: weak, masteryPercent: mp });
     this.buildChapterProgress();
   },
 
   buildChapterProgress: function() {
     var cp = [];
-    var chapters = this.data.chapters;
-    for (var i = 0; i < chapters.length; i++) {
-      var ch = chapters[i];
+    for (var i = 0; i < this.data.chapters.length; i++) {
+      var ch = this.data.chapters[i];
       var kps = this.data.kpsByChapter[ch.id] || [];
       var mastered = 0;
-      for (var j = 0; j < kps.length; j++) {
-        if (kps[j].masteryLevel === "mastered") mastered++;
-      }
-      cp.push({
-        title: ch.title,
-        mastered: mastered,
-        total: kps.length,
-        percent: kps.length > 0 ? Math.round(mastered / kps.length * 100) : 0,
-      });
+      for (var j = 0; j < kps.length; j++) { if (kps[j].masteryLevel === "mastered") mastered++; }
+      cp.push({ title: ch.title, mastered: mastered, total: kps.length, percent: kps.length > 0 ? Math.round(mastered / kps.length * 100) : 0 });
     }
     this.setData({ chapterProgress: cp });
   },
@@ -179,10 +161,7 @@ Page({
   switchTab: function(e) {
     var t = e.currentTarget.dataset.tab;
     this.setData({ tab: t });
-    if (t === "analysis" || t === "home") {
-      this.refreshStats();
-      this.buildChapterProgress();
-    }
+    if (t === "analysis" || t === "home") this.refreshStats();
   },
 
   toggleChapter: function(e) {
@@ -199,66 +178,61 @@ Page({
     this.setData({ sectionOpen: so });
   },
 
-  // Quiz
+  toggleKpDetail: function(e) {
+    var id = e.currentTarget.dataset.id;
+    var ko = this.data.kpOpen;
+    ko[id] = !ko[id];
+    this.setData({ kpOpen: ko });
+  },
+
+  // ============ QUIZ ============
   startQuiz: function(e) {
     var mode = e.currentTarget.dataset.mode;
     var chId = e.currentTarget.dataset.id;
     var pool = [];
-
     if (mode === "chapter" && chId) {
       var sbc = this.data.sectionsByChapter;
-      var secIds = (sbc[chId] || []).map(function(s) { return s.id; });
+      var secIds = [];
+      var chSecs = sbc[chId] || [];
+      for (var i = 0; i < chSecs.length; i++) secIds.push(chSecs[i].id);
       var kpIds = [];
-      for (var i = 0; i < DATA.knowledgePoints.length; i++) {
-        if (secIds.indexOf(DATA.knowledgePoints[i].sectionId) > -1) kpIds.push(DATA.knowledgePoints[i].id);
+      for (var j = 0; j < DATA.knowledgePoints.length; j++) {
+        if (secIds.indexOf(DATA.knowledgePoints[j].sectionId) > -1) kpIds.push(DATA.knowledgePoints[j].id);
       }
-      for (var j = 0; j < DATA.questions.length; j++) {
-        if (kpIds.indexOf(DATA.questions[j].knowledgePointId) > -1) pool.push(DATA.questions[j]);
+      for (var k = 0; k < DATA.questions.length; k++) {
+        if (kpIds.indexOf(DATA.questions[k].knowledgePointId) > -1) pool.push(DATA.questions[k]);
       }
     } else if (mode === "weak") {
-      var weakIds = [];
-      for (var k = 0; k < DATA.knowledgePoints.length; k++) {
-        if (DATA.knowledgePoints[k].masteryLevel === "weak") weakIds.push(DATA.knowledgePoints[k].id);
-      }
-      for (var l = 0; l < DATA.questions.length; l++) {
-        if (weakIds.indexOf(DATA.questions[l].knowledgePointId) > -1) pool.push(DATA.questions[l]);
+      for (var l = 0; l < DATA.knowledgePoints.length; l++) {
+        if (DATA.knowledgePoints[l].masteryLevel === "weak") {
+          for (var m = 0; m < DATA.questions.length; m++) {
+            if (DATA.questions[m].knowledgePointId === DATA.knowledgePoints[l].id) pool.push(DATA.questions[m]);
+          }
+        }
       }
       if (pool.length === 0) pool = DATA.questions.slice();
     } else {
       pool = DATA.questions.slice();
     }
-
     pool = shuffle(pool);
     var questions = pool.slice(0, 30);
     var q = questions[0] || {};
+    var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
+    var initStates = [];
+    for (var n = 0; n < opts.length; n++) initStates.push("opt-def");
 
     this.setData({
-      quizMode: mode,
-      quizQuestions: questions,
-      quizIdx: 0,
-      quizResults: [],
-      quizSelected: [],
-      quizSubmitted: false,
-      quizCorrect: false,
-      quizFinished: false,
-      currentQuestion: q,
-      qTypeLabel: TP[q.type] || q.type || "",
+      quizMode: mode, quizQuestions: questions, quizIdx: 0, quizResults: [],
+      quizSelected: [], quizSubmitted: false, quizCorrect: false, quizFinished: false,
+      currentQuestion: q, qTypeLabel: TP[q.type] || q.type || "",
       correctAnswerDisplay: normAnswer(q.answer || "", q.type || ""),
-      displayOptions: (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"],
-      correctCount: 0,
-      quizRate: 0,
-      quizProgress: 0,
-      optionsState: [],
-      resultMsg: "",
-      resultClass: "",
+      displayOptions: opts, correctCount: 0, quizRate: 0, quizProgress: 0,
+      optStates: initStates, resultMsg: "", resultClass: "",
     });
   },
 
   quitQuiz: function() {
-    this.setData({
-      quizMode: null, quizFinished: false, quizSubmitted: false, quizSelected: [],
-      quizQuestions: [], quizResults: [], quizIdx: 0,
-    });
+    this.setData({ quizMode: null, quizFinished: false, quizSubmitted: false, quizSelected: [], quizQuestions: [], quizResults: [], quizIdx: 0 });
   },
 
   selectOption: function(e) {
@@ -272,24 +246,22 @@ Page({
     } else {
       sel = [label];
     }
-    // Compute option states
-    var states = this.computeOptionStates(q, sel, false, "");
-    this.setData({ quizSelected: sel, optionsState: states });
+    this.setData({ quizSelected: sel, optStates: this.buildOptStates(q, sel, false, "") });
   },
 
-  computeOptionStates: function(q, selected, submitted, correctAnswer) {
+  buildOptStates: function(q, selected, submitted, correctAnswer) {
     var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
     var states = [];
     for (var i = 0; i < opts.length; i++) {
       var label = OPT[i];
-      var state = "";
       if (submitted) {
-        if (correctAnswer.indexOf(label) > -1) state = "correct";
-        else if (selected.indexOf(label) > -1) state = "wrong";
+        if (correctAnswer.indexOf(label) > -1) states.push("opt-ok");
+        else if (selected.indexOf(label) > -1) states.push("opt-err");
+        else states.push("opt-def");
       } else {
-        if (selected.indexOf(label) > -1) state = "selected";
+        if (selected.indexOf(label) > -1) states.push("opt-sel");
+        else states.push("opt-def");
       }
-      states.push(state);
     }
     return states;
   },
@@ -297,30 +269,24 @@ Page({
   submitAnswer: function() {
     if (this.data.quizSelected.length === 0) return;
     var q = this.data.quizQuestions[this.data.quizIdx];
-    var isMulti = q.type === "multi_choice";
-    var ua = isMulti ? this.data.quizSelected.sort().join(",") : this.data.quizSelected[0];
+    var ua = q.type === "multi_choice" ? this.data.quizSelected.slice().sort().join(",") : this.data.quizSelected[0];
     var ok = checkAns(ua, q.answer, q.type);
     var results = this.data.quizResults.slice();
     results.push({ qid: q.id, ok: ok });
     var correctCount = 0;
     for (var i = 0; i < results.length; i++) { if (results[i].ok) correctCount++; }
-    var quizRate = results.length > 0 ? Math.round(correctCount / results.length * 100) : 0;
-
-    // Save
+    var rate = results.length > 0 ? Math.round(correctCount / results.length * 100) : 0;
     var h = wx.getStorageSync("fe_history") || [];
     h.push({ qid: q.id, ans: ua, ok: ok, ts: new Date().toISOString() });
     if (h.length > 1000) h.splice(0, h.length - 1000);
     wx.setStorageSync("fe_history", h);
-
     var ca = normAnswer(q.answer || "", q.type || "");
-    var states = this.computeOptionStates(q, this.data.quizSelected, true, ca);
-    var msg = ok ? "✅ 回答正确!" : "❌ 回答错误，正确答案是 " + ca;
-
+    var states = this.buildOptStates(q, this.data.quizSelected, true, ca);
+    var msg = ok ? "回答正确!" : "回答错误，正确答案是 " + ca;
     this.setData({
       quizSubmitted: true, quizCorrect: ok, quizResults: results,
-      correctCount: correctCount, quizRate: quizRate,
-      optionsState: states, resultMsg: msg,
-      resultClass: ok ? "result-correct" : "result-wrong",
+      correctCount: correctCount, quizRate: rate, optStates: states,
+      resultMsg: msg, resultClass: ok ? "result-correct" : "result-wrong",
     });
   },
 
@@ -328,17 +294,14 @@ Page({
     if (this.data.quizIdx > 0) {
       var idx = this.data.quizIdx - 1;
       var q = this.data.quizQuestions[idx];
-      var prev = this.data.quizResults[idx];
       var ca = normAnswer(q.answer || "", q.type || "");
-      var states = this.computeOptionStates(q, [], true, ca);
+      var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
       this.setData({
-        quizIdx: idx, quizSubmitted: true, quizCorrect: prev ? prev.ok : false,
-        quizSelected: [], currentQuestion: q,
-        qTypeLabel: TP[q.type] || q.type || "",
-        correctAnswerDisplay: ca,
-        displayOptions: (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"],
-        optionsState: states, resultMsg: "",
-        resultClass: "",
+        quizIdx: idx, quizSubmitted: true, quizCorrect: this.data.quizResults[idx] ? this.data.quizResults[idx].ok : false,
+        quizSelected: [], currentQuestion: q, qTypeLabel: TP[q.type] || q.type || "",
+        correctAnswerDisplay: ca, displayOptions: opts,
+        optStates: this.buildOptStates(q, [], true, ca),
+        resultMsg: "", resultClass: "", quizProgress: Math.round(idx / this.data.quizQuestions.length * 100),
       });
     }
   },
@@ -347,14 +310,15 @@ Page({
     if (this.data.quizIdx < this.data.quizQuestions.length - 1) {
       var idx = this.data.quizIdx + 1;
       var q = this.data.quizQuestions[idx];
+      var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
+      var initStates = [];
+      for (var i = 0; i < opts.length; i++) initStates.push("opt-def");
       this.setData({
         quizIdx: idx, quizSubmitted: false, quizCorrect: false,
-        quizSelected: [], currentQuestion: q,
-        qTypeLabel: TP[q.type] || q.type || "",
-        correctAnswerDisplay: "",
-        displayOptions: (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"],
-        optionsState: [], resultMsg: "", resultClass: "",
-        quizProgress: Math.round((idx) / this.data.quizQuestions.length * 100),
+        quizSelected: [], currentQuestion: q, qTypeLabel: TP[q.type] || q.type || "",
+        correctAnswerDisplay: "", displayOptions: opts,
+        optStates: initStates, resultMsg: "", resultClass: "",
+        quizProgress: Math.round(idx / this.data.quizQuestions.length * 100),
       });
     } else if (this.data.quizSubmitted) {
       this.setData({ quizFinished: true, quizProgress: 100 });
@@ -363,19 +327,17 @@ Page({
 
   retryQuiz: function() {
     var mode = this.data.quizMode;
-    var chId = null;
     this.setData({ quizFinished: false, quizMode: null });
-    this.startQuiz({ currentTarget: { dataset: { mode: mode, id: chId } } });
+    this.startQuiz({ currentTarget: { dataset: { mode: mode } } });
   },
 
-  // Search
+  // ============ SEARCH ============
   doSearch: function(e) {
     var q = e.detail.value;
     this.setData({ searchQuery: q });
     if (!q.trim()) { this.setData({ searchKps: [], searchQs: [] }); return; }
     var lower = q.toLowerCase();
-    var kps = [];
-    var qs = [];
+    var kps = [], qs = [];
     for (var i = 0; i < DATA.knowledgePoints.length && kps.length < 20; i++) {
       var k = DATA.knowledgePoints[i];
       if (k.title.toLowerCase().indexOf(lower) > -1 || k.content.toLowerCase().indexOf(lower) > -1) kps.push(k);
