@@ -1,0 +1,7 @@
+/* Global styles */
+page {
+  --primary: #1976D2;
+  --primary-light: #42A5F5;
+  --bg: #F0F7FF;
+  --card-bg: #FFFFFF;
+}

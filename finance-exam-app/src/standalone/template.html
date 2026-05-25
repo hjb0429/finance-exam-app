@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1976D2">
+<title>中级财务管理 · 智能学习平台</title>
+<style>
+*,::before,::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#F0F7FF;color:#212121;max-width:600px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.header{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;padding:16px 20px;text-align:center;position:sticky;top:0;z-index:10}
+.header h1{font-size:18px;font-weight:700}
+.header p{font-size:12px;opacity:.8;margin-top:2px}
+.nav{display:flex;background:#fff;border-bottom:1px solid #E3F2FD;position:sticky;top:72px;z-index:10;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.nav button{flex:0 0 auto;padding:10px 14px;font-size:13px;border:none;background:none;color:#757575;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.nav button.active{color:#1976D2;border-bottom-color:#1976D2;font-weight:600}
+.main{flex:1;padding:16px;overflow-y:auto}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h3{font-size:15px;margin-bottom:8px;color:#212121}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stat .num{font-size:24px;font-weight:700;color:#1976D2}
+.stat .lbl{font-size:11px;color:#757575;margin-top:2px}
+.tree-item{padding:4px 0}
+.tree-toggle{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;transition:background .15s}
+.tree-toggle:hover{background:#F0F7FF}
+.tree-toggle .arrow{font-size:10px;transition:transform .2s;width:16px;text-align:center;flex-shrink:0}
+.tree-toggle .arrow.open{transform:rotate(90deg)}
+.tree-children{margin-left:20px;display:none}
+.tree-children.open{display:block}
+.tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:6px}
+.tag-mastered{background:#E8F5E9;color:#2E7D32}
+.tag-weak{background:#FFF3E0;color:#E65100}
+.tag-new{background:#E3F2FD;color:#1565C0}
+.question-type{font-size:11px;color:#42A5F5;font-weight:600}
+.question-stem{font-size:14px;margin:8px 0;line-height:1.6}
+.option{display:block;width:100%;text-align:left;padding:10px 14px;margin:4px 0;border:1.5px solid #E3F2FD;border-radius:10px;background:#fff;font-size:13px;cursor:pointer;transition:all .15s}
+.option:hover{background:#F0F7FF}
+.option.selected{border-color:#1976D2;background:#E3F2FD}
+.option.correct{border-color:#4CAF50;background:#E8F5E9}
+.option.wrong{border-color:#F44336;background:#FFEBEE}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary{background:#1976D2;color:#fff;width:100%}
+.btn-primary:hover{background:#1565C0}
+.btn-outline{background:#fff;color:#1976D2;border:1.5px solid #E3F2FD}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.result-banner{border-radius:10px;padding:14px;margin:12px 0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.result-correct{background:#E8F5E9;color:#2E7D32}
+.result-wrong{background:#FFEBEE;color:#C62828}
+.result-analysis{font-size:12px;color:#555;margin-top:6px;line-height:1.5}
+.search-input{width:100%;padding:12px 16px;border:1.5px solid #E3F2FD;border-radius:12px;font-size:14px;outline:none;background:#F0F7FF;transition:border .2s}
+.search-input:focus{border-color:#1976D2}
+.progress-bar{height:6px;background:#E3F2FD;border-radius:3px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;background:#1976D2;border-radius:3px;transition:width .3s}
+.empty{text-align:center;padding:40px 20px;color:#90CAF9}
+.empty .icon{font-size:40px;margin-bottom:12px}
+.quiz-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.quiz-nav span{font-size:13px;color:#757575}
+.chapter-list button{display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;font-size:13px;color:#555;cursor:pointer;border-radius:8px;margin:2px 0}
+.chapter-list button:hover{background:#F0F7FF;color:#1976D2}
+.select-btn{display:block;width:100%;text-align:left;padding:14px;background:#fff;border-radius:12px;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:10px;font-size:13px}
+.select-btn:hover{background:#F0F7FF}
+.select-btn .icon{font-size:20px;margin-bottom:6px}
+.select-btn h4{font-size:14px;margin:4px 0;color:#212121}
+.select-btn p{font-size:12px;color:#757575}
+.guide-list{list-style:none}
+.guide-list li{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#555;padding:4px 0}
+.guide-list li::before{content:'';width:6px;height:6px;background:#1976D2;border-radius:50%;flex-shrink:0;margin-top:5px}
+.mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.mode-cards .select-btn{text-align:center}
+.gradient-banner{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border-radius:12px;padding:18px;margin-bottom:12px}
+.gradient-banner h2{font-size:18px}
+.gradient-banner p{font-size:12px;opacity:.8;margin-top:4px}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>中级财务管理 · 智能学习</h1>
+  <p>2026考季 · 完全离线 · 10章586题</p>
+</div>
+
+<div class="nav" id="nav"></div>
+<div class="main" id="main"></div>
+
+<script>
+/* ===== DATA (injected at build time) ===== */
+const DATA = __DATA_JSON__;
+
+/* ===== HELPERS ===== */
+const $$ = (s,p) => (p||document).querySelector(s);
+const $ = (h) => {const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild};
+const ls = k => { try{return JSON.parse(localStorage.getItem(k))}catch{return null} };
+const ss = (k,v) => { try{localStorage.setItem(k,JSON.stringify(v))}catch{} };
+
+function normAnswer(raw, type) {
+  const t = raw.trim();
+  if (type === 'true_false') {
+    if (/^(true|正确|对|是|a)$/i.test(t)) return 'A';
+    if (/^(false|错误|错|否|b)$/i.test(t)) return 'B';
+    return t.toUpperCase();
+  }
+  if (type === 'multi_choice') {
+    const letters = t.match(/[A-Za-z]/g);
+    if (!letters || !letters.length) return t.toUpperCase();
+    return [...new Set(letters.map(l=>l.toUpperCase()))].sort().join('');
+  }
+  return t.toUpperCase().charAt(0);
+}
+
+function checkAns(user, correct, type) {
+  let u = user.trim();
+  let c = normAnswer(correct, type);
+  if (type === 'multi_choice') u = (u.match(/[A-Za-z]/g)||[]).map(l=>l.toUpperCase()).sort().join('');
+  else u = u.toUpperCase().charAt(0);
+  return u === c;
+}
+
+const OPTIONS = ['A','B','C','D','E','F','G','H'];
+const TYPE_LABELS = { single_choice:'单选', multi_choice:'多选', true_false:'判断', calculation:'计算' };
+const TABS = ['🏠 首页','📚 框架','✏️ 刷题','📊 分析','🔍 搜索','⚙️ 后台'];
+
+/* ===== STATE ===== */
+let tab = 'home';
+let quizMode = null; // 'chapter' | 'random'
+let quizChapter = null;
+let quizQuestions = [];
+let quizIdx = 0;
+let quizResults = [];
+let quizSelected = [];
+let quizSubmitted = false;
+let quizCorrect = false;
+
+/* ===== LOCAL STORAGE ===== */
+function getHistory() { return ls('fe_history') || []; }
+function addHistory(qid, ans, ok) {
+  const h = getHistory();
+  h.push({ qid, ans, ok, ts: new Date().toISOString() });
+  if (h.length > 1000) h.splice(0, h.length - 1000);
+  ss('fe_history', h);
+}
+function getStats() {
+  const h = getHistory();
+  if (!h.length) return { total:0, correct:0, rate:0 };
+  const correct = h.filter(a=>a.ok).length;
+  return { total:h.length, correct, rate:Math.round(correct/h.length*100) };
+}
+
+/* ===== RENDER ===== */
+function render() {
+  renderNav();
+  switch(tab) {
+    case 'home': renderHome(); break;
+    case 'framework': renderFramework(); break;
+    case 'practice': renderPractice(); break;
+    case 'analysis': renderAnalysis(); break;
+    case 'search': renderSearch(); break;
+    case 'admin': renderAdmin(); break;
+  }
+}
+
+function renderNav() {
+  $$('#nav').innerHTML = TABS.map((t,i) => {
+    const key = ['home','framework','practice','analysis','search','admin'][i];
+    return `<button class="${tab===key?'active':''}" onclick="tab='${key}';render()">${t}</button>`;
+  }).join('');
+}
+
+/* ===== HOME ===== */
+function renderHome() {
+  const s = getStats();
+  const g = DATA.guides;
+  const masteredKp = DATA.knowledgePoints.filter(k=>k.masteryLevel==='mastered').length;
+  const weakKp = DATA.knowledgePoints.filter(k=>k.masteryLevel==='weak').length;
+  const totalKp = DATA.knowledgePoints.length;
+
+  $$('#main').innerHTML = `
+    <div class="gradient-banner">
+      <h2>${s.total > 0 ? '欢迎回来' : '开始学习吧'}</h2>
+      <p>中级财务管理 · 2026考季智能备考</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="num">${s.total}</div><div class="lbl">做题总数</div></div>
+      <div class="stat"><div class="num">${s.rate}%</div><div class="lbl">正确率</div></div>
+      <div class="stat"><div class="num">586</div><div class="lbl">题库总量</div></div>
+      <div class="stat"><div class="num">${weakKp}</div><div class="lbl">薄弱点</div></div>
+    </div>
+    <div class="card">
+      <h3>知识掌握概览</h3>
+      <div class="progress-bar"><div class="progress-fill" style="width:${totalKp>0?Math.round(masteredKp/totalKp*100):0}%"></div></div>
+      <div style="display:flex;gap:16px;font-size:11px;color:#757575;margin-top:6px">
+        <span>● 已掌握 ${masteredKp}</span><span>● 薄弱 ${weakKp}</span><span>● 未学 ${totalKp-masteredKp-weakKp}</span>
+      </div>
+    </div>
+    <div class="card"><h3>📋 2026 备考指南</h3>
+      ${g.guide ? `<ul class="guide-list">${(g.guide.keyPoints||[]).slice(0,5).map(k=>`<li>${k}</li>`).join('')}</ul>` : '<p style="font-size:12px;color:#757575">暂无数据</p>'}
+    </div>
+    <div class="card"><h3>📝 2026 教材变动</h3>
+      ${g.changes ? `<ul class="guide-list">${(g.changes.keyPoints||[]).slice(0,5).map(k=>`<li>${k}</li>`).join('')}</ul>` : '<p style="font-size:12px;color:#757575">暂无数据</p>'}
+    </div>
+  `;
+}
+
+/* ===== FRAMEWORK ===== */
+function renderFramework() {
+  const chs = DATA.chapters.sort((a,b)=>a.order-b.order);
+  let html = '<h3 style="margin-bottom:12px">知识框架 <span style="font-size:12px;color:#757575">共 '+chs.length+' 章</span></h3>';
+
+  for (const ch of chs) {
+    const secs = DATA.sections.filter(s=>s.chapterId===ch.id);
+    html += `<div class="tree-item"><div class="tree-toggle" onclick="toggleTree(this)"><span class="arrow">▶</span><strong>${ch.title}</strong></div><div class="tree-children">`;
+    for (const sec of secs.sort((a,b)=>a.order-b.order)) {
+      const kps = DATA.knowledgePoints.filter(k=>k.sectionId===sec.id);
+      html += `<div class="tree-item"><div class="tree-toggle" onclick="toggleTree(this)"><span class="arrow">▶</span>${sec.title} <span style="font-size:11px;color:#757575">(${kps.length}个知识点)</span></div><div class="tree-children">`;
+      for (const kp of kps) {
+        const tag = kp.masteryLevel==='mastered'?'tag-mastered':kp.masteryLevel==='weak'?'tag-weak':'tag-new';
+        const tagText = kp.masteryLevel==='mastered'?'已掌握':kp.masteryLevel==='weak'?'薄弱':'未学';
+        html += `<div class="tree-toggle" style="cursor:default"><span style="width:16px"></span>${kp.title}<span class="tag ${tag}">${tagText}</span></div>`;
+      }
+      html += '</div></div>';
+    }
+    html += '</div></div>';
+  }
+  html += '<p style="text-align:center;font-size:12px;color:#757575;margin-top:12px">共 '+DATA.knowledgePoints.length+' 个知识点</p>';
+  $$('#main').innerHTML = html;
+}
+
+function toggleTree(el) {
+  const arrow = el.querySelector('.arrow');
+  const children = el.nextElementSibling;
+  if (arrow) arrow.classList.toggle('open');
+  if (children) children.classList.toggle('open');
+}
+
+/* ===== PRACTICE ===== */
+function renderPractice() {
+  if (quizMode) { renderQuiz(); return; }
+
+  const chs = DATA.chapters.sort((a,b)=>a.order-b.order);
+  $$('#main').innerHTML = `
+    <h3 style="margin-bottom:12px">刷题练习</h3>
+    <div class="mode-cards">
+      <button class="select-btn" onclick="startQuiz('random')">
+        <div style="font-size:24px">🎲</div><h4>随机练习</h4><p>随机抽30题</p>
+      </button>
+      <button class="select-btn" onclick="startQuiz('weak')">
+        <div style="font-size:24px">🎯</div><h4>薄弱点专练</h4><p>专攻薄弱环节</p>
+      </button>
+    </div>
+    <div class="card"><h4 style="margin-bottom:8px;font-size:14px">按章练习</h4>
+      <div class="chapter-list">${chs.map(ch=>`<button onclick="startQuiz('chapter',${ch.id})">${ch.title}</button>`).join('')}</div>
+    </div>
+  `;
+}
+
+function startQuiz(mode, chapterId) {
+  quizMode = mode;
+  quizChapter = chapterId;
+  quizIdx = 0;
+  quizResults = [];
+  quizSelected = [];
+  quizSubmitted = false;
+  quizCorrect = false;
+
+  let pool = [];
+  if (mode === 'chapter' && chapterId) {
+    const secIds = DATA.sections.filter(s=>s.chapterId===chapterId).map(s=>s.id);
+    const kpIds = DATA.knowledgePoints.filter(k=>secIds.includes(k.sectionId)).map(k=>k.id);
+    pool = DATA.questions.filter(q=>kpIds.includes(q.knowledgePointId));
+  } else if (mode === 'weak') {
+    const weakKpIds = DATA.knowledgePoints.filter(k=>k.masteryLevel==='weak').map(k=>k.id);
+    pool = DATA.questions.filter(q=>weakKpIds.includes(q.knowledgePointId));
+    if (pool.length === 0) pool = DATA.questions;
+  } else {
+    pool = [...DATA.questions];
+  }
+
+  // Shuffle
+  for (let i = pool.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]; }
+  quizQuestions = pool.slice(0, 30);
+  render();
+}
+
+function renderQuiz() {
+  const q = quizQuestions[quizIdx];
+  if (!q) { quizMode=null; render(); return; }
+  if (quizIdx >= quizQuestions.length || (quizSubmitted && quizIdx >= quizQuestions.length-1 && quizResults.length === quizQuestions.length)) {
+    renderQuizResults();
+    return;
+  }
+
+  const isMulti = q.type === 'multi_choice';
+  const displayOpts = q.options.length > 0 ? q.options : ['A. 正确', 'B. 错误'];
+  const normCorrect = normAnswer(q.answer, q.type);
+
+  let optionsHtml = '';
+  for (let i = 0; i < displayOpts.length; i++) {
+    const label = OPTIONS[i];
+    const sel = quizSelected.includes(label);
+    let cls = '';
+    if (quizSubmitted) {
+      if (normCorrect.includes(label)) cls = 'correct';
+      else if (sel) cls = 'wrong';
+    } else if (sel) cls = 'selected';
+    optionsHtml += `<button class="option ${cls}" onclick="selectOpt('${label}')">${displayOpts[i]}</button>`;
+  }
+
+  $$('#main').innerHTML = `
+    <div class="quiz-nav">
+      <button class="btn btn-outline" onclick="quizMode=null;render()">← 退出</button>
+      <span>${quizIdx+1}/${quizQuestions.length}</span>
+      <span>✓ ${quizResults.filter(r=>r.ok).length}</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${(quizIdx/quizQuestions.length)*100}%"></div></div>
+    <div class="card">
+      <div class="question-type">${TYPE_LABELS[q.type]||q.type}${isMulti?' (多选)':''}</div>
+      <div class="question-stem">${q.stem}</div>
+      ${optionsHtml}
+      ${!quizSubmitted ? `<button class="btn btn-primary" style="margin-top:12px" onclick="submitAnswer()" ${quizSelected.length===0?'disabled':''}>提交答案</button>` : ''}
+      ${quizSubmitted ? `
+        <div class="result-banner ${quizCorrect?'result-correct':'result-wrong'}">
+          ${quizCorrect ? '✅ 回答正确!' : '❌ 回答错误，正确答案是 '+normCorrect}
+        </div>
+        <div class="result-analysis">${q.analysis}</div>
+      ` : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-outline" style="flex:1" onclick="prevQuestion()" ${quizIdx===0?'disabled':''}>上一题</button>
+      <button class="btn btn-primary" style="flex:1" onclick="nextQuestion()">${quizIdx<quizQuestions.length-1?'下一题':'查看结果'}</button>
+    </div>
+  `;
+
+  // Scroll to question
+  $$('#main').scrollIntoView({behavior:'smooth'});
+}
+
+function selectOpt(label) {
+  if (quizSubmitted) return;
+  const q = quizQuestions[quizIdx];
+  if (q.type === 'multi_choice') {
+    quizSelected = quizSelected.includes(label) ? quizSelected.filter(l=>l!==label) : [...quizSelected, label];
+  } else {
+    quizSelected = [label];
+  }
+  renderQuiz();
+}
+
+function submitAnswer() {
+  if (quizSelected.length === 0) return;
+  const q = quizQuestions[quizIdx];
+  const isMulti = q.type === 'multi_choice';
+  const ua = isMulti ? quizSelected.sort().join(',') : quizSelected[0];
+  quizCorrect = checkAns(ua, q.answer, q.type);
+  quizSubmitted = true;
+  quizResults.push({ qid: q.id, ok: quizCorrect });
+  addHistory(q.id, ua, quizCorrect);
+  renderQuiz();
+}
+
+function prevQuestion() {
+  if (quizIdx > 0) {
+    quizIdx--;
+    // Restore previous answer state
+    const prev = quizResults[quizIdx];
+    quizSubmitted = true;
+    quizCorrect = prev ? prev.ok : false;
+    quizSelected = [];
+    renderQuiz();
+  }
+}
+
+function nextQuestion() {
+  if (quizIdx < quizQuestions.length - 1) {
+    quizIdx++;
+    quizSubmitted = false;
+    quizCorrect = false;
+    quizSelected = [];
+    renderQuiz();
+  } else if (quizSubmitted && quizIdx === quizQuestions.length - 1) {
+    quizIdx++;
+    renderQuiz();
+  } else if (quizIdx >= quizQuestions.length) {
+    renderQuizResults();
+  }
+}
+
+function renderQuizResults() {
+  const correct = quizResults.filter(r=>r.ok).length;
+  const rate = quizResults.length ? Math.round(correct/quizResults.length*100) : 0;
+
+  $$('#main').innerHTML = `
+    <div class="card" style="text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">${rate>=80?'🎉':rate>=60?'👍':'💪'}</div>
+      <h3>练习完成!</h3>
+      <div class="stats" style="margin-top:12px">
+        <div class="stat"><div class="num">${quizResults.length}</div><div class="lbl">总题数</div></div>
+        <div class="stat"><div class="num">${correct}</div><div class="lbl">正确</div></div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${rate}%"></div></div>
+      <p style="font-size:13px;color:#757575;margin-top:6px">正确率 ${rate}%</p>
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="quizMode=null;startQuiz(quizMode,quizChapter);render()">再来一组</button>
+        <button class="btn btn-outline" style="flex:1" onclick="quizMode=null;render()">返回</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ===== ANALYSIS ===== */
+function renderAnalysis() {
+  const s = getStats();
+  if (s.total === 0) {
+    $$('#main').innerHTML = '<div class="empty"><div class="icon">📊</div><p>完成一定量的题目后，系统将自动分析你的知识掌握情况</p></div>';
+    return;
+  }
+
+  const totalKp = DATA.knowledgePoints.length;
+  const masteredKp = DATA.knowledgePoints.filter(k=>k.masteryLevel==='mastered').length;
+  const weakKp = DATA.knowledgePoints.filter(k=>k.masteryLevel==='weak').length;
+
+  let html = '<h3 style="margin-bottom:12px">学习分析</h3>';
+  html += `<div class="stats"><div class="stat"><div class="num">${s.total}</div><div class="lbl">总做题数</div></div><div class="stat"><div class="num">${s.rate}%</div><div class="lbl">正确率</div></div><div class="stat"><div class="num">${masteredKp}/${totalKp}</div><div class="lbl">已掌握知识点</div></div><div class="stat"><div class="num">${weakKp}</div><div class="lbl">薄弱点</div></div></div>`;
+
+  html += '<div class="card"><h3>整体掌握度</h3><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(masteredKp/totalKp*100)+'%"></div></div><div style="font-size:11px;color:#757575;margin-top:6px">已掌握: '+Math.round(masteredKp/totalKp*100)+'% | 薄弱: '+weakKp+' 个</div></div>';
+
+  // Chapter breakdown
+  html += '<div class="card"><h3>章节进度</h3>';
+  for (const ch of DATA.chapters.sort((a,b)=>a.order-b.order)) {
+    const secs = DATA.sections.filter(s=>s.chapterId===ch.id);
+    const kps = DATA.knowledgePoints.filter(k=>secs.some(s=>s.id===k.sectionId));
+    const mastered = kps.filter(k=>k.masteryLevel==='mastered').length;
+    html += `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px"><span>${ch.title}</span><span>${mastered}/${kps.length}</span></div><div class="progress-bar"><div class="progress-fill" style="width:${kps.length>0?Math.round(mastered/kps.length*100):0}%"></div></div></div>`;
+  }
+  html += '</div>';
+
+  $$('#main').innerHTML = html;
+}
+
+/* ===== SEARCH ===== */
+let searchTimer;
+function renderSearch() {
+  $$('#main').innerHTML = `
+    <h3 style="margin-bottom:12px">搜索</h3>
+    <input class="search-input" placeholder="搜索知识点或题目..." oninput="doSearch(this.value)">
+    <div id="search-results" class="empty"><div class="icon">🔍</div><p>输入关键词搜索</p></div>
+  `;
+}
+
+function doSearch(q) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    const res = $$('#search-results');
+    if (!res) return;
+    if (!q.trim()) { res.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>输入关键词搜索</p></div>'; return; }
+
+    const lower = q.toLowerCase();
+    const kps = DATA.knowledgePoints.filter(k=>k.title.toLowerCase().includes(lower)||k.content.toLowerCase().includes(lower)).slice(0,20);
+    const qs = DATA.questions.filter(q=>q.stem.toLowerCase().includes(lower)||(q.analysis||'').toLowerCase().includes(lower)).slice(0,20);
+
+    if (!kps.length && !qs.length) {
+      res.innerHTML = `<div class="empty"><p>未找到与 "${q}" 相关的结果</p></div>`;
+      return;
+    }
+
+    let html = '';
+    if (kps.length) {
+      html += `<div style="font-size:13px;font-weight:600;color:#757575;margin-bottom:8px">📚 知识点 (${kps.length})</div>`;
+      kps.forEach(k=>{ html += `<div class="card" style="cursor:pointer" onclick="tab='framework';render()"><h4>${k.title}</h4><p style="font-size:12px;color:#757575;margin-top:4px">${k.content.slice(0,100)}</p></div>`; });
+    }
+    if (qs.length) {
+      html += `<div style="font-size:13px;font-weight:600;color:#757575;margin:12px 0 8px">❓ 题目 (${qs.length})</div>`;
+      qs.forEach(q=>{ html += `<div class="card"><div style="font-size:11px;color:#42A5F5;font-weight:600">${TYPE_LABELS[q.type]||q.type}</div><p style="font-size:13px;margin-top:4px">${q.stem.slice(0,120)}${q.stem.length>120?'...':''}</p></div>`; });
+    }
+    res.innerHTML = html;
+  }, 150);
+}
+
+/* ===== ADMIN ===== */
+function renderAdmin() {
+  $$('#main').innerHTML = `
+    <h3 style="margin-bottom:12px">后台管理</h3>
+    <div class="card" style="text-align:center">
+      <div class="icon" style="font-size:40px;margin-bottom:12px">🔧</div>
+      <h4>PDF 资料上传与 AI 解析</h4>
+      <p style="font-size:12px;color:#757575;margin-top:8px">此功能需要运行本地服务器。需要在 VS Code 中启动开发模式。</p>
+      <div style="text-align:left;background:#F0F7FF;border-radius:8px;padding:12px;margin-top:12px;font-size:11px;color:#555;line-height:1.6">
+        <strong>操作步骤：</strong>
+        <ol style="padding-left:16px;margin-top:4px">
+          <li>VS Code → 打开项目</li>
+          <li>终端：<code>cd finance-exam-app && npm run dev</code></li>
+          <li>打开 http://localhost:3000/admin</li>
+          <li>上传PDF → AI解析 → 重新构建离线版</li>
+        </ol>
+      </div>
+      <p style="font-size:12px;color:#757575;margin-top:12px">✅ 当前已导入：10章 · 146知识点 · 586题</p>
+    </div>
+  `;
+}
+
+/* ===== INIT ===== */
+render();
+
+// Handle back button
+window.addEventListener('popstate', () => { tab='home'; quizMode=null; render(); });
+</script>
+</body>
+</html>
