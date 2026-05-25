@@ -44,7 +44,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "3.3.4",
+  "libVersion": "3.16.0",
   "appid": "wx6208c8ed4400d9bc",
   "projectname": "finance-exam-miniapp",
   "condition": {},

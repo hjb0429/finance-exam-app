@@ -1,4 +1,4 @@
-const DATA = require("../../utils/data.js");
+﻿const DATA = require("../../utils/data.js");
 
 function normAnswer(raw, type) {
   const t = (raw || "").trim();

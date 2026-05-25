@@ -1,4 +1,4 @@
-<!-- 首页 -->
+﻿<!-- 首页 -->
 <view class="container" wx:if="{{tab==='home'}}">
   <view class="banner">
     <view class="banner-title">{{stats.totalAttempts>0?'欢迎回来':'开始学习吧'}}</view>
