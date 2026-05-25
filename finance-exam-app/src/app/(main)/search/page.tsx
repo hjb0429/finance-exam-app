@@ -1,50 +1,17 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Search, BookOpen, HelpCircle } from "lucide-react";
 import Link from "next/link";
-import { searchLocalQuestions, cacheQuestions } from "@/lib/local-db";
-import type { LocalQuestion } from "@/lib/local-db";
-
-interface SearchResults {
-  knowledgePoints: Array<{
-    id: number;
-    title: string;
-    content: string;
-    sectionId: number;
-  }>;
-  questions: Array<{
-    id: number;
-    stem: string;
-    type: string;
-  }>;
-}
+import { searchLocal } from "@/lib/embedded-data";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResults | null>(null);
+  const [results, setResults] = useState<{
+    knowledgePoints: Array<{ id: number; title: string; content: string; sectionId: number }>;
+    questions: Array<{ id: number; stem: string; type: string }>;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Cache questions for offline search
-  useEffect(() => {
-    fetch("/api/questions?limit=600")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.questions) {
-          cacheQuestions(
-            data.questions.map((q: { id: number; type: string; stem: string; options: string[]; answer: string; analysis: string }) => ({
-              id: q.id,
-              type: q.type,
-              stem: q.stem,
-              options: q.options,
-              answer: q.answer,
-              analysis: q.analysis || "",
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -52,26 +19,11 @@ export default function SearchPage() {
       return;
     }
     setLoading(true);
-
-    try {
-      // Try server first
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      setResults(data);
-    } catch {
-      // Offline: search locally
-      const localQuestions = searchLocalQuestions(q);
-      setResults({
-        knowledgePoints: [],
-        questions: localQuestions.map((q) => ({
-          id: q.id,
-          stem: q.stem,
-          type: q.type,
-        })),
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Small delay for responsive typing feel
+    await new Promise((r) => setTimeout(r, 100));
+    const data = searchLocal(q);
+    setResults(data);
+    setLoading(false);
   }, []);
 
   return (
@@ -80,10 +32,7 @@ export default function SearchPage() {
 
       <div className="rounded-xl bg-white p-6 shadow-sm">
         <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-          />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
           <input
             type="text"
             value={query}
@@ -100,10 +49,7 @@ export default function SearchPage() {
       {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-16 animate-pulse rounded-lg bg-white shadow-sm"
-            />
+            <div key={i} className="h-16 animate-pulse rounded-lg bg-white shadow-sm" />
           ))}
         </div>
       )}
@@ -118,15 +64,9 @@ export default function SearchPage() {
               </h3>
               <div className="mt-2 space-y-2">
                 {results.knowledgePoints.map((kp) => (
-                  <Link
-                    key={kp.id}
-                    href="/framework"
-                    className="block rounded-lg bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
-                  >
+                  <Link key={kp.id} href="/framework" className="block rounded-lg bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
                     <p className="font-medium text-text-primary">{kp.title}</p>
-                    <p className="mt-1 text-sm text-text-secondary line-clamp-2">
-                      {kp.content}
-                    </p>
+                    <p className="mt-1 text-sm text-text-secondary line-clamp-2">{kp.content}</p>
                   </Link>
                 ))}
               </div>
@@ -141,18 +81,9 @@ export default function SearchPage() {
               </h3>
               <div className="mt-2 space-y-2">
                 {results.questions.map((q) => (
-                  <div
-                    key={q.id}
-                    className="rounded-lg bg-white p-4 shadow-sm"
-                  >
+                  <div key={q.id} className="rounded-lg bg-white p-4 shadow-sm">
                     <span className="text-xs text-primary-light">
-                      {q.type === "single_choice"
-                        ? "单选"
-                        : q.type === "multi_choice"
-                        ? "多选"
-                        : q.type === "true_false"
-                        ? "判断"
-                        : "计算"}
+                      {q.type === "single_choice" ? "单选" : q.type === "multi_choice" ? "多选" : q.type === "true_false" ? "判断" : "计算"}
                     </span>
                     <p className="mt-1 text-sm text-text-primary">{q.stem}</p>
                   </div>
@@ -161,25 +92,19 @@ export default function SearchPage() {
             </div>
           )}
 
-          {query &&
-            results.knowledgePoints.length === 0 &&
-            results.questions.length === 0 && (
-              <div className="rounded-xl bg-white p-8 text-center shadow-sm">
-                <Search size={32} className="mx-auto text-primary-lighter" />
-                <p className="mt-2 text-text-secondary">
-                  未找到与 "{query}" 相关的结果
-                </p>
-              </div>
-            )}
+          {query && results.knowledgePoints.length === 0 && results.questions.length === 0 && (
+            <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+              <Search size={32} className="mx-auto text-primary-lighter" />
+              <p className="mt-2 text-text-secondary">未找到与 "{query}" 相关的结果</p>
+            </div>
+          )}
         </div>
       )}
 
       {!query && !results && (
         <div className="rounded-xl bg-white p-8 text-center shadow-sm">
           <Search size={40} className="mx-auto text-primary-lighter" />
-          <p className="mt-3 text-text-secondary">
-            输入关键词搜索知识框架和题库中的内容
-          </p>
+          <p className="mt-3 text-text-secondary">输入关键词搜索知识框架和题库中的内容</p>
         </div>
       )}
     </div>

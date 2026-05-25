@@ -199,12 +199,16 @@ export function isOnline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine;
 }
 
-/** Auto-sync on reconnect */
+/** Auto-sync on reconnect AND on page load if online */
 export function setupAutoSync(): () => void {
+  // Sync immediately if already online
+  if (isOnline()) {
+    syncAttemptsToServer();
+  }
+
+  // Also sync when coming back online
   const handler = () => {
-    if (isOnline()) {
-      syncAttemptsToServer();
-    }
+    syncAttemptsToServer();
   };
   window.addEventListener("online", handler);
   return () => window.removeEventListener("online", handler);

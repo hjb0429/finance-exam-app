@@ -283,8 +283,8 @@ const sampleData: ParsedPdfContent = {
   ],
 };
 
-export function seedData() {
-  const result = importParsedContent(sampleData);
+export async function seedData() {
+  const result = await importParsedContent(sampleData);
   console.log("Seed data imported:", result);
   return result;
 }

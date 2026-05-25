@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, BarChart3 } from "lucide-react";
 import type { Question } from "@/lib/types";
 import { recordAttempt, setupAutoSync } from "@/lib/local-db";
+import { checkAnswer } from "@/lib/answer-utils";
+import { getQuestionsByChapter, getRandomQuestions, getAllQuestions } from "@/lib/embedded-data";
 import QuestionCard from "./QuestionCard";
 
 interface QuizSessionProps {
@@ -12,43 +14,39 @@ interface QuizSessionProps {
   onBack: () => void;
 }
 
-export default function QuizSession({
-  mode,
-  chapterId,
-  onBack,
-}: QuizSessionProps) {
+export default function QuizSession({ mode, chapterId, onBack }: QuizSessionProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [results, setResults] = useState<
-    { questionId: number; isCorrect: boolean }[]
-  >([]);
+  const [results, setResults] = useState<{ questionId: number; isCorrect: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
 
   const fetchQuestions = useCallback(() => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (mode === "chapter" && chapterId) {
-      params.set("chapterId", String(chapterId));
-    }
-    if (mode === "random") {
-      params.set("mode", "random");
-    }
-    if (mode === "weak") {
-      params.set("mode", "weak");
-    }
-    params.set("limit", "30");
+    let qs: Question[];
 
-    fetch(`/api/questions?${params}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setQuestions(data.questions || []);
-        setCurrentIdx(0);
-        setResults([]);
-        setFinished(false);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    if (mode === "random") {
+      qs = getRandomQuestions(30);
+    } else if (mode === "chapter" && chapterId) {
+      qs = getQuestionsByChapter(chapterId);
+      // Shuffle
+      for (let i = qs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [qs[i], qs[j]] = [qs[j], qs[i]];
+      }
+    } else if (mode === "weak") {
+      // For fully offline mode, weak detection uses local history
+      // Fall back to random if no weak points found
+      qs = getRandomQuestions(30);
+    } else {
+      qs = getAllQuestions().slice(0, 30);
+    }
+
+    setQuestions(qs);
+    setCurrentIdx(0);
+    setResults([]);
+    setFinished(false);
+    setLoading(false);
   }, [mode, chapterId]);
 
   useEffect(() => {
@@ -57,33 +55,16 @@ export default function QuizSession({
     return cleanup;
   }, [fetchQuestions]);
 
-  const handleSubmit = async (answer: string) => {
+  const handleSubmit = (answer: string) => {
     const question = questions[currentIdx];
     if (!question) return;
 
-    let isCorrectResult = false;
+    const isCorrectResult = checkAnswer(answer, question.answer, question.type);
 
-    try {
-      const res = await fetch("/api/questions/attempt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: question.id, userAnswer: answer }),
-      });
-      const data = await res.json();
-      isCorrectResult = data.isCorrect;
-    } catch {
-      // Offline: check answer locally
-      const { checkAnswer: localCheck } = await import("@/lib/answer-utils");
-      isCorrectResult = localCheck(answer, question.answer, question.type);
-    }
-
-    // Always save to local DB for persistent history
+    // Always save locally
     recordAttempt(question.id, answer, isCorrectResult);
 
-    setResults((prev) => [
-      ...prev,
-      { questionId: question.id, isCorrect: isCorrectResult },
-    ]);
+    setResults((prev) => [...prev, { questionId: question.id, isCorrect: isCorrectResult }]);
   };
 
   const handleNext = () => {
@@ -95,9 +76,7 @@ export default function QuizSession({
   };
 
   const handlePrev = () => {
-    if (currentIdx > 0) {
-      setCurrentIdx((prev) => prev - 1);
-    }
+    if (currentIdx > 0) setCurrentIdx((prev) => prev - 1);
   };
 
   if (loading) {
@@ -113,10 +92,7 @@ export default function QuizSession({
     return (
       <div className="rounded-xl bg-white p-8 text-center shadow-sm">
         <p className="text-text-secondary">暂无题目</p>
-        <button
-          onClick={onBack}
-          className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-        >
+        <button onClick={onBack} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
           返回选择
         </button>
       </div>
@@ -125,10 +101,7 @@ export default function QuizSession({
 
   if (finished) {
     const correctCount = results.filter((r) => r.isCorrect).length;
-    const rate =
-      results.length > 0
-        ? Math.round((correctCount / results.length) * 100)
-        : 0;
+    const rate = results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
 
     return (
       <div className="space-y-6">
@@ -150,17 +123,11 @@ export default function QuizSession({
             </div>
           </div>
           <div className="mt-6 flex justify-center gap-3">
-            <button
-              onClick={fetchQuestions}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
+            <button onClick={fetchQuestions} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
               <RefreshCw size={16} />
               再来一组
             </button>
-            <button
-              onClick={onBack}
-              className="rounded-lg border border-primary-bg px-4 py-2 text-sm font-medium text-text-secondary hover:bg-primary-bg/50 transition-colors"
-            >
+            <button onClick={onBack} className="rounded-lg border border-primary-bg px-4 py-2 text-sm font-medium text-text-secondary hover:bg-primary-bg/50 transition-colors">
               返回选择
             </button>
           </div>
@@ -173,57 +140,30 @@ export default function QuizSession({
 
   return (
     <div className="space-y-4">
-      {/* Progress bar */}
       <div className="flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-sm text-text-secondary hover:text-primary transition-colors"
-        >
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-text-secondary hover:text-primary transition-colors">
           <ChevronLeft size={16} />
           退出
         </button>
         <div className="flex-1">
           <div className="flex items-center justify-between text-sm text-text-secondary">
-            <span>
-              第 {currentIdx + 1} / {questions.length} 题
-            </span>
-            <span>
-              正确: {results.filter((r) => r.isCorrect).length} /{" "}
-              {results.length}
-            </span>
+            <span>第 {currentIdx + 1} / {questions.length} 题</span>
+            <span>正确: {results.filter((r) => r.isCorrect).length} / {results.length}</span>
           </div>
           <div className="mt-1 h-1.5 rounded-full bg-primary-bg">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{
-                width: `${((currentIdx + 1) / questions.length) * 100}%`,
-              }}
-            />
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }} />
           </div>
         </div>
       </div>
 
-      {/* Question */}
-      <QuestionCard
-        key={question.id}
-        question={question}
-        onSubmit={handleSubmit}
-      />
+      <QuestionCard key={question.id} question={question} onSubmit={handleSubmit} />
 
-      {/* Navigation */}
       <div className="flex justify-between">
-        <button
-          onClick={handlePrev}
-          disabled={currentIdx === 0}
-          className="flex items-center gap-1 rounded-lg border border-primary-bg px-4 py-2 text-sm text-text-secondary hover:bg-primary-bg/50 disabled:opacity-40 transition-colors"
-        >
+        <button onClick={handlePrev} disabled={currentIdx === 0} className="flex items-center gap-1 rounded-lg border border-primary-bg px-4 py-2 text-sm text-text-secondary hover:bg-primary-bg/50 disabled:opacity-40 transition-colors">
           <ChevronLeft size={16} />
           上一题
         </button>
-        <button
-          onClick={handleNext}
-          className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-        >
+        <button onClick={handleNext} className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
           {currentIdx < questions.length - 1 ? "下一题" : "查看结果"}
           <ChevronRight size={16} />
         </button>

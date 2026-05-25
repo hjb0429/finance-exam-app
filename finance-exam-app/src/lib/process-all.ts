@@ -63,7 +63,7 @@ async function processChapter(chapterName: string) {
   console.log(`  Total ${allText.length} chars → AI structuring...`);
   try {
     const parsed = await structurePdfContent(allText);
-    const result = importParsedContent(parsed);
+    const result = await importParsedContent(parsed);
     console.log(`  ✅ ${result.chaptersImported} chapters, ${result.questionsImported} questions`);
     parsed.chapters.forEach((ch) =>
       console.log(`     - ${ch.title} (${ch.sections.length} sections)`)

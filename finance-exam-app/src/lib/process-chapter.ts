@@ -88,7 +88,7 @@ async function processChapter(folderPath: string) {
 
     // Phase 3: Import
     console.log("\n💾 Importing to data store...");
-    const result = importParsedContent(parsed);
+    const result = await importParsedContent(parsed);
     console.log(
       `  ✓ Imported: ${result.chaptersImported} chapters, ${result.questionsImported} questions`
     );

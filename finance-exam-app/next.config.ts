@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "export",
+  // Allow importing JSON from data directory
+  experimental: {
+    // static export with JSON works by default
+  },
 };
 
 export default nextConfig;
