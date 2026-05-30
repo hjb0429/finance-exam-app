@@ -100,12 +100,19 @@
         <view class="card">
           <view class="q-type">{{qTypeLabel}}{{currentQuestion.type==='multi_choice'?' (多选)':''}}</view>
           <view class="q-stem">{{currentQuestion.stem}}</view>
-          <block wx:for="{{displayOptions}}" wx:key="*this" wx:for-item="opt" wx:for-index="oi">
-            <view class="opt-row {{optStates[oi]}}" bindtap="selectOption" data-label="{{optLabels[oi]}}">
-              <view class="opt-dot {{optStates[oi]==='opt-sel'?'dot-sel':optStates[oi]==='opt-ok'?'dot-ok':optStates[oi]==='opt-err'?'dot-err':'dot-def'}}"></view>
-              <text class="opt-text">{{opt}}</text>
-            </view>
+          <!-- Choice options (single/multi/true_false) -->
+          <block wx:if="{{currentQuestion.type!=='calculation'}}">
+            <block wx:for="{{displayOptions}}" wx:key="*this" wx:for-item="opt" wx:for-index="oi">
+              <view class="opt-row {{optStates[oi]}}" bindtap="selectOption" data-label="{{optLabels[oi]}}">
+                <view class="opt-dot {{optStates[oi]==='opt-sel'?'dot-sel':optStates[oi]==='opt-ok'?'dot-ok':optStates[oi]==='opt-err'?'dot-err':'dot-def'}}"></view>
+                <text class="opt-text">{{opt}}</text>
+              </view>
+            </block>
           </block>
+          <!-- Text area for calculation/fill-in questions -->
+          <view wx:if="{{currentQuestion.type==='calculation'}}" class="calc-area">
+            <textarea class="calc-textarea" placeholder="输入你的答案..." value="{{calcInput}}" bindinput="onCalcInput" maxlength="-1" auto-height="{{true}}" show-confirm-bar="{{false}}"/>
+          </view>
           <button class="submit-btn" wx:if="{{!quizSubmitted}}" bindtap="submitAnswer">提交答案</button>
           <view wx:if="{{quizSubmitted}}" class="result-banner {{resultClass}}">{{resultMsg}}</view>
           <view wx:if="{{quizSubmitted}}" class="analysis-text">{{currentQuestion.analysis}}</view>

@@ -88,6 +88,7 @@ Page({
     chapterProgress: [],
     masteryPercent: 0,
     optLabels: OPT,
+    calcInput: "",
   },
 
   onLoad: function() {
@@ -221,13 +222,14 @@ Page({
     var initStates = [];
     for (var n = 0; n < opts.length; n++) initStates.push("opt-def");
 
+    var isCalc = q && q.type === "calculation";
     this.setData({
       quizMode: mode, quizQuestions: questions, quizIdx: 0, quizResults: [],
       quizSelected: [], quizSubmitted: false, quizCorrect: false, quizFinished: false,
       currentQuestion: q, qTypeLabel: TP[q.type] || q.type || "",
-      correctAnswerDisplay: normAnswer(q.answer || "", q.type || ""),
-      displayOptions: opts, correctCount: 0, quizRate: 0, quizProgress: 0,
-      optStates: initStates, resultMsg: "", resultClass: "",
+      correctAnswerDisplay: isCalc ? (q.answer || "") : normAnswer(q.answer || "", q.type || ""),
+      displayOptions: isCalc ? [] : opts, correctCount: 0, quizRate: 0, quizProgress: 0,
+      optStates: initStates, resultMsg: "", resultClass: "", calcInput: "",
     });
   },
 
@@ -235,10 +237,15 @@ Page({
     this.setData({ quizMode: null, quizFinished: false, quizSubmitted: false, quizSelected: [], quizQuestions: [], quizResults: [], quizIdx: 0 });
   },
 
+  onCalcInput: function(e) {
+    this.setData({ calcInput: e.detail.value });
+  },
+
   selectOption: function(e) {
     if (this.data.quizSubmitted) return;
-    var label = e.currentTarget.dataset.label;
     var q = this.data.quizQuestions[this.data.quizIdx];
+    if (q.type === "calculation") return;
+    var label = e.currentTarget.dataset.label;
     var sel = this.data.quizSelected.slice();
     if (q.type === "multi_choice") {
       var idx = sel.indexOf(label);
@@ -267,10 +274,21 @@ Page({
   },
 
   submitAnswer: function() {
-    if (this.data.quizSelected.length === 0) return;
     var q = this.data.quizQuestions[this.data.quizIdx];
-    var ua = q.type === "multi_choice" ? this.data.quizSelected.slice().sort().join(",") : this.data.quizSelected[0];
-    var ok = checkAns(ua, q.answer, q.type);
+    var isCalc = q.type === "calculation";
+    var ua, ok;
+
+    if (isCalc) {
+      ua = (this.data.calcInput || "").trim();
+      if (!ua) return; // Don't submit empty
+      var correctAns = (q.answer || "").trim();
+      ok = ua === correctAns || ua.toLowerCase() === correctAns.toLowerCase();
+    } else {
+      if (this.data.quizSelected.length === 0) return;
+      ua = q.type === "multi_choice" ? this.data.quizSelected.slice().sort().join(",") : this.data.quizSelected[0];
+      ok = checkAns(ua, q.answer, q.type);
+    }
+
     var results = this.data.quizResults.slice();
     results.push({ qid: q.id, ok: ok });
     var correctCount = 0;
@@ -280,8 +298,8 @@ Page({
     h.push({ qid: q.id, ans: ua, ok: ok, ts: new Date().toISOString() });
     if (h.length > 1000) h.splice(0, h.length - 1000);
     wx.setStorageSync("fe_history", h);
-    var ca = normAnswer(q.answer || "", q.type || "");
-    var states = this.buildOptStates(q, this.data.quizSelected, true, ca);
+    var ca = isCalc ? (q.answer || "") : normAnswer(q.answer || "", q.type || "");
+    var states = isCalc ? [] : this.buildOptStates(q, this.data.quizSelected, true, ca);
     var msg = ok ? "回答正确!" : "回答错误，正确答案是 " + ca;
     this.setData({
       quizSubmitted: true, quizCorrect: ok, quizResults: results,
@@ -294,14 +312,16 @@ Page({
     if (this.data.quizIdx > 0) {
       var idx = this.data.quizIdx - 1;
       var q = this.data.quizQuestions[idx];
-      var ca = normAnswer(q.answer || "", q.type || "");
-      var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
+      var isCalc = q.type === "calculation";
+      var ca = isCalc ? (q.answer || "") : normAnswer(q.answer || "", q.type || "");
+      var opts = isCalc ? [] : ((q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"]);
       this.setData({
         quizIdx: idx, quizSubmitted: true, quizCorrect: this.data.quizResults[idx] ? this.data.quizResults[idx].ok : false,
         quizSelected: [], currentQuestion: q, qTypeLabel: TP[q.type] || q.type || "",
         correctAnswerDisplay: ca, displayOptions: opts,
-        optStates: this.buildOptStates(q, [], true, ca),
+        optStates: isCalc ? [] : this.buildOptStates(q, [], true, ca),
         resultMsg: "", resultClass: "", quizProgress: Math.round(idx / this.data.quizQuestions.length * 100),
+        calcInput: "",
       });
     }
   },
@@ -310,15 +330,17 @@ Page({
     if (this.data.quizIdx < this.data.quizQuestions.length - 1) {
       var idx = this.data.quizIdx + 1;
       var q = this.data.quizQuestions[idx];
-      var opts = (q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"];
+      var isCalc = q.type === "calculation";
+      var opts = isCalc ? [] : ((q.options && q.options.length > 0) ? q.options : ["A. 正确", "B. 错误"]);
       var initStates = [];
-      for (var i = 0; i < opts.length; i++) initStates.push("opt-def");
+      if (!isCalc) { for (var i = 0; i < opts.length; i++) initStates.push("opt-def"); }
       this.setData({
         quizIdx: idx, quizSubmitted: false, quizCorrect: false,
         quizSelected: [], currentQuestion: q, qTypeLabel: TP[q.type] || q.type || "",
         correctAnswerDisplay: "", displayOptions: opts,
         optStates: initStates, resultMsg: "", resultClass: "",
         quizProgress: Math.round(idx / this.data.quizQuestions.length * 100),
+        calcInput: "",
       });
     } else if (this.data.quizSubmitted) {
       this.setData({ quizFinished: true, quizProgress: 100 });
