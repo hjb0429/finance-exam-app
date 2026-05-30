@@ -280,9 +280,11 @@ Page({
 
     if (isCalc) {
       ua = (this.data.calcInput || "").trim();
-      if (!ua) return; // Don't submit empty
-      var correctAns = (q.answer || "").trim();
-      ok = ua === correctAns || ua.toLowerCase() === correctAns.toLowerCase();
+      if (!ua) return;
+      // Strip all spaces for comparison (handles formatting differences)
+      var normUser = ua.replace(/\s+/g, "").toLowerCase();
+      var normAns = (q.answer || "").trim().replace(/\s+/g, "").toLowerCase();
+      ok = normUser === normAns;
     } else {
       if (this.data.quizSelected.length === 0) return;
       ua = q.type === "multi_choice" ? this.data.quizSelected.slice().sort().join(",") : this.data.quizSelected[0];
